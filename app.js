@@ -1709,3 +1709,271 @@ document.addEventListener("DOMContentLoaded", () => {
   switchPage(state.activePage || "crm");
   setInterval(evaluateAutomationRules, 1000);
 });
+
+
+// ============================================================================
+// Google Sheets Cloud Sync & Authorized Users / Daily Email Trigger Integration
+// ============================================================================
+
+let syncTimeoutId = null;
+
+function setSyncIndicator(status, text) {
+  const badge = document.getElementById("syncStatusBadge");
+  const icon = document.getElementById("syncStatusIcon");
+  const label = document.getElementById("syncStatusText");
+  if (!badge || !icon || !label) return;
+
+  label.textContent = text;
+  if (status === "saving") {
+    icon.textContent = "⏳";
+    badge.style.background = "rgba(245, 179, 1, 0.16)";
+    badge.style.borderColor = "rgba(245, 179, 1, 0.4)";
+    badge.style.color = "#fde68a";
+  } else if (status === "saved") {
+    icon.textContent = "☁️";
+    badge.style.background = "rgba(22, 179, 100, 0.16)";
+    badge.style.borderColor = "rgba(22, 179, 100, 0.4)";
+    badge.style.color = "#a6f4c5";
+  } else if (status === "error") {
+    icon.textContent = "⚠️";
+    badge.style.background = "rgba(239, 68, 68, 0.18)";
+    badge.style.borderColor = "rgba(239, 68, 68, 0.45)";
+    badge.style.color = "#fca5a5";
+  }
+}
+
+// Override saveState to sync directly with Google Sheets when running in Google Apps Script
+const originalLocalSaveState = saveState;
+saveState = function () {
+  originalLocalSaveState();
+
+  if (typeof google !== "undefined" && google.script && google.script.run) {
+    setSyncIndicator("saving", "שומר ל-Google Sheets…");
+    if (syncTimeoutId) clearTimeout(syncTimeoutId);
+
+    syncTimeoutId = setTimeout(() => {
+      google.script.run
+        .withSuccessHandler((res) => {
+          setSyncIndicator("saved", "מסונכרן עם Google Sheets ✓");
+        })
+        .withFailureHandler((err) => {
+          console.error("Google Sheets sync error:", err);
+          setSyncIndicator("error", "שגיאת סנכרון לשיטס");
+          showToast("⚠️ שגיאה בשמירה ל-Google Sheets: " + (err.message || err));
+        })
+        .apiSyncState({
+          stages: state.stages,
+          rules: state.rules,
+          leads: state.leads,
+          tasks: state.tasks,
+          allowedUsers: state.allowedUsers || [
+            { email: "dgescheidt3@gmail.com", name: "דורון (מנהל מערכת)", receiveDailyEmail: true },
+          ],
+        });
+    }, 350);
+  }
+};
+
+// Override resetDemoData to also reset Google Sheets when in Apps Script
+const originalLocalResetDemoData = resetDemoData;
+resetDemoData = function () {
+  if (typeof google !== "undefined" && google.script && google.script.run) {
+    setSyncIndicator("saving", "מאפס נתונים בשיטס…");
+    google.script.run
+      .withSuccessHandler((serverState) => {
+        applyServerState(serverState);
+        setSyncIndicator("saved", "מסונכרן עם Google Sheets ✓");
+        showToast("🔄 הנתונים ב-Google Sheets אופסו לברירת המחדל");
+      })
+      .withFailureHandler((err) => {
+        showToast("⚠️ שגיאה באיפוס: " + (err.message || err));
+      })
+      .apiResetDemoData();
+  } else {
+    originalLocalResetDemoData();
+  }
+};
+
+function applyServerState(serverState) {
+  if (!serverState) return;
+  if (Array.isArray(serverState.stages) && serverState.stages.length > 0) state.stages = serverState.stages;
+  if (Array.isArray(serverState.rules)) state.rules = serverState.rules;
+  if (Array.isArray(serverState.leads)) state.leads = serverState.leads;
+  if (Array.isArray(serverState.tasks)) state.tasks = serverState.tasks;
+  if (Array.isArray(serverState.allowedUsers)) state.allowedUsers = serverState.allowedUsers;
+
+  if (serverState.currentUser && serverState.currentUser.email) {
+    const badge = document.getElementById("currentUserBadge");
+    if (badge) badge.textContent = serverState.currentUser.name || serverState.currentUser.email;
+  }
+
+  if (serverState.spreadsheetUrl) {
+    const link = document.getElementById("openGoogleSheetLink");
+    if (link) {
+      link.href = serverState.spreadsheetUrl;
+      link.style.display = "flex";
+    }
+  }
+
+  const trigLabel = document.getElementById("triggersStatusLabel");
+  if (trigLabel && serverState.triggersInstalled) {
+    trigLabel.innerHTML = "✅ <strong>התזמון היומי פעיל בשרתי גוגל!</strong> מייל המשימות נשלח אוטומטית בכל בוקר ב-08:00.";
+  }
+
+  originalLocalSaveState();
+  renderAll();
+}
+
+// ============================================================================
+// Modal 5: Authorized Users & Daily Morning Email Controls
+// ============================================================================
+
+function openUsersAndEmailModal() {
+  if (!Array.isArray(state.allowedUsers) || state.allowedUsers.length === 0) {
+    state.allowedUsers = [
+      { email: "dgescheidt3@gmail.com", name: "דורון (מנהל מערכת)", receiveDailyEmail: true, addedAt: getOffsetDateKey(0) },
+      { email: "lightsofyoga@gmail.com", name: "בית היוגה", receiveDailyEmail: true, addedAt: getOffsetDateKey(0) },
+    ];
+  }
+  renderAllowedUsersList();
+  document.getElementById("usersModal").classList.add("open");
+}
+
+function closeUsersAndEmailModal() {
+  document.getElementById("usersModal").classList.remove("open");
+}
+
+function renderAllowedUsersList() {
+  const container = document.getElementById("allowedUsersList");
+  if (!container) return;
+
+  const users = state.allowedUsers || [];
+  container.innerHTML = users
+    .map((u, idx) => {
+      const isPrimary = (u.email || "").toLowerCase() === "dgescheidt3@gmail.com";
+      return `
+        <div class="manager-row" style="justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <strong dir="ltr" style="color: var(--accent-ink);">${escapeHtml(u.email)}</strong>
+            <span style="color: var(--muted);">(${escapeHtml(u.name || "")})</span>
+            ${isPrimary ? `<span class="pf-badge pf-past">בעלים ראשי</span>` : ""}
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                ${u.receiveDailyEmail !== false ? "checked" : ""}
+                onchange="toggleUserDailyEmail(${idx}, this.checked)"
+              />
+              <span>קבלת מייל משימות יומי</span>
+            </label>
+            ${
+              isPrimary
+                ? ""
+                : `<button class="btn danger sm" type="button" onclick="removeAllowedUser(${idx})">🗑️ הסר</button>`
+            }
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function handleAddAllowedUser(event) {
+  event.preventDefault();
+  const emailInput = document.getElementById("newAllowedEmail");
+  const nameInput = document.getElementById("newAllowedName");
+  const mailCheck = document.getElementById("newAllowedDailyMail");
+
+  const email = emailInput.value.trim().toLowerCase();
+  const name = nameInput.value.trim();
+  if (!email) return;
+
+  state.allowedUsers = state.allowedUsers || [];
+  if (state.allowedUsers.some((u) => (u.email || "").toLowerCase() === email)) {
+    showToast("⚠️ כתובת ג'ימייל זו כבר מופיעה ברשימת המורשים");
+    return;
+  }
+
+  state.allowedUsers.push({
+    email,
+    name: name || email,
+    receiveDailyEmail: mailCheck.checked,
+    addedAt: getOffsetDateKey(0),
+  });
+
+  emailInput.value = "";
+  nameInput.value = "";
+  saveState();
+  renderAllowedUsersList();
+  showToast(`🔐 החשבון ${email} נוסף לרשימת המורשים ב-Google Sheets!`);
+}
+
+function toggleUserDailyEmail(index, checked) {
+  if (!state.allowedUsers || !state.allowedUsers[index]) return;
+  state.allowedUsers[index].receiveDailyEmail = checked;
+  saveState();
+  showToast(checked ? "📩 המשתמש יקבל מייל משימות יומי בבוקר" : "🔕 בוטלה שליחת מייל יומי למשתמש זה");
+}
+
+function removeAllowedUser(index) {
+  if (!state.allowedUsers || !state.allowedUsers[index]) return;
+  const removed = state.allowedUsers.splice(index, 1)[0];
+  saveState();
+  renderAllowedUsersList();
+  showToast(`🗑️ ההרשאה של ${removed.email} הוסרה`);
+}
+
+function sendDailyEmailTestNow() {
+  if (typeof google !== "undefined" && google.script && google.script.run) {
+    showToast("📩 שולח כעת מייל סיכום משימות פתוחות לתיבת הג'ימייל שלך…");
+    google.script.run
+      .withSuccessHandler((res) => {
+        showToast(`✅ המייל נשלח בהצלחה ל: ${(res.recipients || []).join(", ")} (${res.todayCount} להיום, ${res.overdueCount} באיחור)`);
+      })
+      .withFailureHandler((err) => {
+        showToast("⚠️ שגיאה בשליחת המייל: " + (err.message || err));
+      })
+      .apiSendDailyEmailNow();
+  } else {
+    showToast("ℹ️ שליחת מייל אמיתית פועלת מתוך הקישור של Google Apps Script");
+  }
+}
+
+function installDailyTriggersNow() {
+  if (typeof google !== "undefined" && google.script && google.script.run) {
+    showToast("⏰ מגדיר שעון מעורר יומי בשרתי גוגל…");
+    google.script.run
+      .withSuccessHandler((res) => {
+        const trigLabel = document.getElementById("triggersStatusLabel");
+        if (trigLabel) {
+          trigLabel.innerHTML = "✅ <strong>התזמון היומי פעיל בשרתי גוגל!</strong> מייל המשימות נשלח אוטומטית בכל בוקר ב-08:00.";
+        }
+        showToast("✅ " + res.message);
+      })
+      .withFailureHandler((err) => {
+        showToast("⚠️ שגיאה בהגדרת טריגר: " + (err.message || err));
+      })
+      .apiInstallAutomationTriggers();
+  } else {
+    showToast("ℹ️ הפעלת הטריגר היומי מתבצעת מתוך הקישור של Google Apps Script");
+  }
+}
+
+// Automatically pull live state from Google Sheets on boot when hosted on Google Apps Script
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof google !== "undefined" && google.script && google.script.run) {
+    setSyncIndicator("saving", "טוען נתונים מ-Google Sheets…");
+    google.script.run
+      .withSuccessHandler((serverState) => {
+        applyServerState(serverState);
+        setSyncIndicator("saved", "מחובר ל-Google Sheets ✓");
+      })
+      .withFailureHandler((err) => {
+        console.error("Failed initial load from Google Sheets:", err);
+        setSyncIndicator("error", "שגיאת חיבור לשיטס");
+        showToast("⚠️ לא ניתן לטעון מ-Google Sheets: " + (err.message || err));
+      })
+      .apiGetInitialState();
+  }
+});
