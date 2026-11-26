@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>בית היוגה · מערכת ניהול לידים ומשימות (CRM)</title>
+  <link rel="icon" type="image/png" href="logo.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Right Sidebar (Branded for Beit HaYoga) -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark">
+          <img src="logo.png" alt="בית היוגה" />
+        </div>
+        <div>
+          <div class="brand-title">בית היוגה</div>
+          <div class="brand-sub">מערכת ניהול לידים · מקום שמחבר</div>
+        </div>
+      </div>
+
+      <div class="local-badge-sidebar">
+        <span>🛡️</span>
+        <span>סביבת פיתוח מקומית (מבודד)</span>
+      </div>
+
+      <nav class="nav-list" aria-label="ניווט ראשי">
+        <button id="navLeads" class="nav-item active" type="button" onclick="switchPage('crm')">🗂️ לידים</button>
+        <button id="navTasks" class="nav-item" type="button" onclick="switchPage('today')">
+          <span>📋 המשימות שלי</span>
+          <span id="sidebarOpenTasksBadge" style="margin-inline-start: auto; background: rgba(245,179,1,0.2); color: #fde68a; font-size: 11px; padding: 1px 7px; border-radius: 99px; font-weight: 700;">0</span>
+        </button>
+        <button class="nav-item" type="button" onclick="openStatusesModal()">➕ ניהול והרחבת סטטוסים</button>
+        <button class="nav-item" type="button" onclick="openAutomationsModal()">⚡ אוטומציות מעבר עמודות</button>
+        <button class="nav-item" type="button" onclick="showToast('בגרסה המקומית פעילים מסכי הלידים, המשימות והאוטומציות')">📞 מסך שיחות</button>
+        <button class="nav-item" type="button" onclick="showToast('בגרסה המקומית פעילים מסכי הלידים, המשימות והאוטומציות')">📊 דוחות</button>
+        <button class="nav-item" type="button" onclick="showToast('בגרסה המקומית פעילים מסכי הלידים, המשימות והאוטומציות')">🎁 חבר מביא חבר</button>
+        <button class="nav-item" type="button" onclick="showToast('בגרסה המקומית פעילים מסכי הלידים, המשימות והאוטומציות')">🔄 לקוחות חוזרים</button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <button class="nav-item" type="button" onclick="resetDemoData()">🔄 איפוס נתוני דמו לברירת מחדל</button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="main-area">
+      <!-- Top Header Bar -->
+      <header class="topbar">
+        <div class="topbar-title-wrap">
+          <div class="studio-logo" title="בית היוגה — מקום שמחבר">
+            <img src="logo.png" alt="בית היוגה" />
+          </div>
+          <div class="topbar-title">
+            <h1 id="pageHeaderTitle">הלידים שלי</h1>
+            <p id="pageHeaderSubtitle" class="topbar-subtitle">פייפליין המכירה של בית היוגה · תומך בהרחבת סטטוסים ומעבר עמודות אוטומטי מבוסס זמן</p>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <button id="headerSwitchPageBtn" class="btn secondary" type="button" onclick="switchPage('today')">
+            📋 המשימות שלי
+          </button>
+          <div class="user-chip">
+            <div class="avatar" style="background: #ffffff; border: 1px solid var(--border); padding: 2px; overflow: hidden;">
+              <img src="logo.png" alt="בי" style="width: 100%; height: 100%; object-fit: contain;" />
+            </div>
+            <span class="u-name">בית היוגה</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- ==================================================================
+           PAGE 1: MY LEADS (/crm)
+           ================================================================== -->
+      <main id="pageCrm" class="app-content">
+        <!-- Toolbar -->
+        <div class="crm-toolbar">
+          <div class="crm-search">
+            <input
+              id="searchInput"
+              class="input-control"
+              type="search"
+              placeholder="חיפוש לפי שם / טלפון / אימייל / קמפיין…"
+              oninput="handleSearch(this.value)"
+            />
+          </div>
+
+          <div class="view-toggle" role="tablist">
+            <button id="tabKanban" class="view-tab active" type="button" onclick="setViewMode('kanban')">
+              📋 צינור
+            </button>
+            <button id="tabList" class="view-tab" type="button" onclick="setViewMode('list')">
+              ☰ רשימה
+            </button>
+          </div>
+
+          <label class="checkbox-label" style="margin-inline-start: 6px;">
+            <input id="showTerminalColsToggle" type="checkbox" checked onchange="toggleShowAllColumns(this.checked)" />
+            <span>הצג בלוח גם עמודות סגירה/מעקב ("מכירה", "לאחר שבוע" וכו')</span>
+          </label>
+
+          <div class="crm-toolbar-spacer"></div>
+
+          <span id="leadsCountLabel" class="toolbar-count">0 לידים בצינור</span>
+
+          <button class="btn status-btn" type="button" onclick="openStatusesModal()">
+            ➕ ניהול סטטוסים ועמודות
+          </button>
+
+          <button class="btn automation-btn" type="button" onclick="openAutomationsModal()">
+            ⚡ חוקי מעבר אוטומטי (<span id="rulesCountBadge">0</span>)
+          </button>
+
+          <button class="btn" type="button" onclick="openNewLeadModal()">
+            + ליד חדש
+          </button>
+        </div>
+
+        <!-- Active Automation Rules Strip & Time Simulator -->
+        <div class="automation-strip">
+          <div class="automation-strip-info" id="activeRulesStrip"></div>
+          <div class="automation-strip-actions">
+            <button class="btn secondary sm" type="button" onclick="simulateTimeTravel(7 * 24 * 60)" title="מקדם את זמן השהייה של כל הלידים ב-7 ימים כדי לבדוק מעבר אוטומטי מיד">
+              ⏩ הרץ סימולציה: +7 ימים קדימה
+            </button>
+            <button class="btn secondary sm" type="button" onclick="simulateTimeTravel(24 * 60)" title="מקדם את זמן השהייה של כל הלידים ביום אחד">
+              ⏩ +1 יום
+            </button>
+            <button class="btn secondary sm" type="button" onclick="openAutomationsModal()">
+              ⚙️ הגדר חוק חדש
+            </button>
+          </div>
+        </div>
+
+        <!-- Kanban View -->
+        <section id="kanbanView" class="kanban" aria-label="לוח לידים"></section>
+
+        <!-- List View -->
+        <section id="listView" class="list-view-container" style="display: none;">
+          <div class="filters-bar">
+            <div class="filter-group">
+              <label for="listFilterStage">שלב:</label>
+              <select id="listFilterStage" class="input-control" style="height: 34px;" onchange="renderAll()">
+                <option value="ALL">הכל</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="listFilterPlatform">פלטפורמה:</label>
+              <select id="listFilterPlatform" class="input-control" style="height: 34px;" onchange="renderAll()">
+                <option value="ALL">הכל</option>
+                <option value="אינסטגרם">אינסטגרם</option>
+                <option value="פייסבוק">פייסבוק</option>
+                <option value="חבר מביא חבר">חבר מביא חבר</option>
+                <option value="לקוח עבר">לקוח עבר</option>
+                <option value="אתר">אתר</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>שם</th>
+                  <th>טלפון</th>
+                  <th>אימייל</th>
+                  <th>שלב בפייפליין</th>
+                  <th>זמן בעמודה הנוכחית</th>
+                  <th>מעבר אוטומטי מתוזמן</th>
+                  <th>פלטפורמה</th>
+                  <th>קמפיין / פרטים</th>
+                </tr>
+              </thead>
+              <tbody id="listTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+
+      <!-- ==================================================================
+           PAGE 2: MY TASKS ("📋 המשימות שלי" - /today)
+           ================================================================== -->
+      <main id="pageToday" class="app-content" style="display: none;">
+        <!-- Tasks Sub-navigation Tabs -->
+        <nav class="tasks-tabs" aria-label="תצוגת משימות">
+          <button id="taskTab_today" class="tasks-tab active" type="button" onclick="setTasksTab('today')">
+            <span>היום</span>
+            <span id="taskCount_today" class="tasks-tab-count">(0)</span>
+          </button>
+          <button id="taskTab_tomorrow" class="tasks-tab" type="button" onclick="setTasksTab('tomorrow')">
+            <span>מחר</span>
+            <span id="taskCount_tomorrow" class="tasks-tab-count">(0)</span>
+          </button>
+          <button id="taskTab_yesterday" class="tasks-tab" type="button" onclick="setTasksTab('yesterday')">
+            <span>אתמול</span>
+            <span id="taskCount_yesterday" class="tasks-tab-count">(0)</span>
+          </button>
+          <button id="taskTab_range" class="tasks-tab" type="button" onclick="setTasksTab('range')">
+            <span>טווח תאריכים</span>
+          </button>
+          <button id="taskTab_overdue" class="tasks-tab tasks-tab-alert" type="button" onclick="setTasksTab('overdue')">
+            <span>לא בוצעו</span>
+            <span id="taskCount_overdue" class="tasks-tab-count">(0)</span>
+          </button>
+        </nav>
+
+        <!-- Tasks Filters & Actions Bar -->
+        <div class="tasks-filters">
+          <div id="tasksRangeInputs" class="tasks-range" style="display: none;">
+            <label>
+              <span>מ־</span>
+              <input id="taskRangeFrom" type="date" class="input-control" style="height: 36px;" onchange="renderTasksPage()" />
+            </label>
+            <label>
+              <span>עד</span>
+              <input id="taskRangeTo" type="date" class="input-control" style="height: 36px;" onchange="renderTasksPage()" />
+            </label>
+          </div>
+
+          <div class="crm-search">
+            <input
+              id="tasksSearchInput"
+              class="input-control"
+              type="search"
+              style="height: 36px; min-width: 230px;"
+              placeholder="סינון משימות לפי שם ליד / הערה…"
+              oninput="renderTasksPage()"
+            />
+          </div>
+
+          <div class="crm-toolbar-spacer"></div>
+
+          <span id="tasksSummaryCount" class="toolbar-count">0 פעילויות · 0 פתוחות</span>
+
+          <button class="btn" type="button" onclick="openNewTaskModal()">
+            + פעילות / משימה חדשה
+          </button>
+        </div>
+
+        <!-- Tasks Table or Empty State -->
+        <div id="tasksContentArea"></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- MODAL 1: Manage & Expand Statuses (Columns) -->
+  <div id="statusesModal" class="modal-backdrop" onclick="if(event.target===this) closeStatusesModal()">
+    <div class="modal-panel">
+      <div class="modal-head">
+        <h2>➕ ניהול והרחבת סטטוסים (עמודות בלוח)</h2>
+        <button class="btn secondary sm" type="button" onclick="closeStatusesModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin: 0; color: var(--muted); font-size: 13.5px;">
+          כאן תוכל להוסיף סטטוסים חדשים (למשל <strong>"לאחר שבוע"</strong>, <strong>"מעקב 30 יום"</strong>, <strong>"ממתין לתשלום"</strong>), לשנות את שמם, צבעם, סדר ההופעה שלהם, או לקבוע אם יוצגו כעמודה בלוח ה-Kanban.
+        </p>
+
+        <form id="addStatusForm" class="manager-row" style="background: #eff8ff; border-color: #b9e0fe;" onsubmit="handleAddStatus(event)">
+          <input
+            id="newStatusColor"
+            type="color"
+            class="color-swatch-input"
+            value="#10b981"
+            title="בחר צבע לסטטוס"
+          />
+          <input
+            id="newStatusName"
+            type="text"
+            class="input-control"
+            style="flex: 1; height: 36px;"
+            placeholder="שם הסטטוס החדש (לדוגמא: לאחר שבוע)…"
+            required
+          />
+          <label class="checkbox-label">
+            <input id="newStatusShowInBoard" type="checkbox" checked />
+            <span>הצג כעמודה בלוח</span>
+          </label>
+          <button class="btn sm" type="submit">+ הוסף סטטוס</button>
+        </form>
+
+        <div id="statusesManagerList" class="list-manager"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" type="button" onclick="closeStatusesModal()">סיום ושמירה</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: Time-Based Column Transition Automations -->
+  <div id="automationsModal" class="modal-backdrop" onclick="if(event.target===this) closeAutomationsModal()">
+    <div class="modal-panel" style="max-width: 740px;">
+      <div class="modal-head">
+        <h2>⚡ אוטומציות מעבר ליד מעמודה לעמודה לפי זמן</h2>
+        <button class="btn secondary sm" type="button" onclick="closeAutomationsModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin: 0; color: var(--muted); font-size: 13.5px;">
+          הגדר חוקים שמעבירים ליד באופן אוטומטי מעמודה אחת לעמודה אחרת לאחר פרק זמן שהגדרת.
+          <br />
+          <em>דוגמא: אם ליד הועבר לסטטוס <strong>"מכירה"</strong> ⬅️ אחרי <strong>1 שבועות</strong> (או ימים/שעות/שניות לבדיקה) ⬅️ העבר אותו אוטומטית לעמודה <strong>"לאחר שבוע"</strong>.</em>
+        </p>
+
+        <form id="addRuleForm" style="background: #f5f3ff; border: 1px solid #ddd6fe; padding: 14px; border-radius: 12px;" onsubmit="handleAddRule(event)">
+          <div style="font-weight: 700; margin-bottom: 10px; color: #4c1d95;">+ הוספת חוק מעבר חדש:</div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="ruleFromStage">כאשר ליד נכנס לעמודה:</label>
+              <select id="ruleFromStage" class="input-control" style="height: 36px;" required></select>
+            </div>
+
+            <div class="form-field">
+              <label for="ruleDurationVal">המתן פרק זמן של:</label>
+              <div style="display: flex; gap: 6px;">
+                <input
+                  id="ruleDurationVal"
+                  type="number"
+                  min="1"
+                  value="1"
+                  class="input-control"
+                  style="width: 75px; height: 36px;"
+                  required
+                />
+                <select id="ruleDurationUnit" class="input-control" style="flex: 1; height: 36px;">
+                  <option value="weeks">שבועות</option>
+                  <option value="days">ימים</option>
+                  <option value="hours">שעות</option>
+                  <option value="minutes">דקות</option>
+                  <option value="seconds">שניות (לבדיקה מהירה)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-field">
+              <label for="ruleToStage">והעבר אותו לעמודה:</label>
+              <select id="ruleToStage" class="input-control" style="height: 36px;" required></select>
+            </div>
+          </div>
+
+          <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 12px; color: var(--muted);">
+              💡 ניתן לבדוק כל חוק מיד באמצעות כפתור <strong>"⏩ הרץ סימולציה: +7 ימים"</strong> בסרגל העליון, או להגדיר שניות ולראות את המעבר מול העיניים.
+            </span>
+            <button class="btn" type="submit">+ שמור והפעל חוק</button>
+          </div>
+        </form>
+
+        <div style="font-weight: 700; font-size: 14px;">חוקים מוגדרים במערכת:</div>
+        <div id="rulesManagerList" class="list-manager"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" type="button" onclick="closeAutomationsModal()">סגור</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: Create New Lead -->
+  <div id="newLeadModal" class="modal-backdrop" onclick="if(event.target===this) closeNewLeadModal()">
+    <div class="modal-panel" style="max-width: 520px;">
+      <div class="modal-head">
+        <h2>+ הוספת ליד חדש</h2>
+        <button class="btn secondary sm" type="button" onclick="closeNewLeadModal()">✕</button>
+      </div>
+      <form onsubmit="handleCreateLead(event)">
+        <div class="modal-body">
+          <div class="form-field">
+            <label for="nlName">שם מלא *</label>
+            <input id="nlName" type="text" class="input-control" required placeholder="למשל: דנה כהן" />
+          </div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="nlPhone">טלפון *</label>
+              <input id="nlPhone" type="text" class="input-control" dir="ltr" required placeholder="050-1234567" />
+            </div>
+            <div class="form-field">
+              <label for="nlEmail">אימייל</label>
+              <input id="nlEmail" type="email" class="input-control" dir="ltr" placeholder="dana@example.com" />
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="nlStage">שלב התחלתי</label>
+              <select id="nlStage" class="input-control"></select>
+            </div>
+            <div class="form-field">
+              <label for="nlPlatform">פלטפורמה / מקור</label>
+              <select id="nlPlatform" class="input-control">
+                <option value="אינסטגרם">אינסטגרם</option>
+                <option value="פייסבוק">פייסבוק</option>
+                <option value="חבר מביא חבר">חבר מביא חבר</option>
+                <option value="לקוח עבר">לקוח עבר</option>
+                <option value="אתר">אתר</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-field">
+            <label for="nlMeta">קמפיין / הערת מקור</label>
+            <input id="nlMeta" type="text" class="input-control" placeholder="למשל: קמפיין חדש1 · 35-60 נשים" />
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn secondary" type="button" onclick="closeNewLeadModal()">ביטול</button>
+          <button class="btn" type="submit">צור ליד</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 4: Create New Task / Activity from My Tasks screen -->
+  <div id="newTaskModal" class="modal-backdrop" onclick="if(event.target===this) closeNewTaskModal()">
+    <div class="modal-panel" style="max-width: 500px;">
+      <div class="modal-head">
+        <h2>⏭️ קביעת פעילות / משימה חדשה</h2>
+        <button class="btn secondary sm" type="button" onclick="closeNewTaskModal()">✕</button>
+      </div>
+      <form onsubmit="handleCreateTaskModal(event)">
+        <div class="modal-body">
+          <div class="form-field">
+            <label for="ntLeadSelect">שיוך לליד *</label>
+            <select id="ntLeadSelect" class="input-control" required></select>
+          </div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="ntTypeSelect">סוג הפעילות *</label>
+              <select id="ntTypeSelect" class="input-control" required>
+                <option value="call">📞 שיחת טלפון</option>
+                <option value="whatsapp">💬 וואטסאפ</option>
+                <option value="meeting">🤝 פגישה</option>
+                <option value="intro_session">🏋️ אימון היכרות</option>
+                <option value="follow_up">🔔 מעקב</option>
+                <option value="task">✅ משימה</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="ntDueInput">מתי (תאריך ושעה) *</label>
+              <input id="ntDueInput" type="datetime-local" class="input-control" dir="ltr" required />
+            </div>
+          </div>
+          <div class="form-field">
+            <label for="ntNoteInput">הערה (אופציונלי)</label>
+            <input id="ntNoteInput" type="text" class="input-control" placeholder="למשל: לחזור אחרי 18:00 / לוודא הגעה לאימון" />
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn secondary" type="button" onclick="closeNewTaskModal()">ביטול</button>
+          <button class="btn" type="submit">קבע פעילות</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- DRAWER: Lead Detail & Timeline -->
+  <div id="leadDrawerBackdrop" class="drawer-backdrop" onclick="if(event.target===this) closeLeadDrawer()">
+    <aside class="drawer" aria-label="פרטי ליד">
+      <div class="drawer-head">
+        <h2 id="drawerLeadName">שם הליד</h2>
+        <button class="btn secondary sm" type="button" onclick="closeLeadDrawer()">✕</button>
+      </div>
+      <div class="drawer-body" id="drawerBodyContent"></div>
+    </aside>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
