@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <title>בית היוגה · מערכת ניהול לידים ומשימות (CRM)</title>
+  <link rel="icon" type="image/png" href="https://doron-g.github.io/beit-hayoga-crm-demo/logo.png" />
   <style>
 /* Taking Control Leads CRM — Local Development Copy */
 @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap');
@@ -1776,15 +1779,130 @@ button, a, [role="button"], .nav-item, .view-tab, .tasks-tab, .act-check, .kanba
   }
 }
 
-  </style>
+/* ============================================================================
+   Full-Screen Login Gate for Authorized Gmail Accounts
+   ============================================================================ */
+
+.login-gate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.login-gate-overlay.hidden {
+  display: none !important;
+}
+
+.login-card {
+  background: #ffffff;
+  color: var(--text);
+  border-radius: 18px;
+  padding: 32px 28px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.35);
+  text-align: center;
+  border: 1px solid var(--border);
+}
+
+.login-logo {
+  width: 78px;
+  height: 78px;
+  margin: 0 auto 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  padding: 4px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.login-card h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.login-card p {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.login-error {
+  background: var(--red-soft);
+  color: var(--red-ink);
+  border: 1px solid var(--red-border);
+  padding: 9px 12px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 14px;
+  display: none;
+}
+
+</style>
 </head>
 <body>
+  <!-- LOGIN GATE OVERLAY (Authorized Gmail Accounts Only) -->
+  <div id="loginGateOverlay" class="login-gate-overlay">
+    <div class="login-card">
+      <div class="login-logo">
+        <img src="https://doron-g.github.io/beit-hayoga-crm-demo/logo.png" class="by-logo-img" alt="בית היוגה" />
+      </div>
+      <h1>בית היוגה · CRM</h1>
+      <p>כניסה למורשים בלבד באמצעות חשבון הג'ימייל המורשה</p>
+
+      <div id="loginErrorBox" class="login-error"></div>
+
+      <form onsubmit="handleLoginSubmit(event)" style="display: flex; flex-direction: column; gap: 12px; text-align: right;">
+        <div class="form-field">
+          <label for="loginEmailInput">כתובת ג'ימייל מורשית</label>
+          <input
+            id="loginEmailInput"
+            type="email"
+            class="input-control"
+            dir="ltr"
+            required
+            placeholder="dgescheidt3@gmail.com / lightsofyoga@gmail.com"
+          />
+        </div>
+        <div class="form-field">
+          <label for="loginPassInput">סיסמה / קוד גישה</label>
+          <input
+            id="loginPassInput"
+            type="password"
+            class="input-control"
+            dir="ltr"
+            required
+            placeholder="••••••••"
+          />
+        </div>
+        <button id="loginSubmitBtn" class="btn" type="submit" style="width: 100%; margin-top: 4px; height: 42px; font-size: 15px;">
+          כניסה למערכת
+        </button>
+      </form>
+    </div>
+  </div>
+
   <div class="app-shell">
     <!-- Right Sidebar (Branded for Beit HaYoga) -->
     <aside class="sidebar">
       <div class="sidebar-brand">
         <div class="brand-mark">
-          <img class="by-logo-img" alt="בית היוגה" />
+          <img src="https://doron-g.github.io/beit-hayoga-crm-demo/logo.png" alt="בית היוגה" />
         </div>
         <div>
           <div class="brand-title">בית היוגה</div>
@@ -1792,9 +1910,9 @@ button, a, [role="button"], .nav-item, .view-tab, .tasks-tab, .act-check, .kanba
         </div>
       </div>
 
-      <div id="syncStatusBadge" class="local-badge-sidebar" style="background: rgba(22, 179, 100, 0.16); border-color: rgba(22, 179, 100, 0.4); color: #a6f4c5;">
-        <span id="syncStatusIcon">☁️</span>
-        <span id="syncStatusText">מחובר ל-Google Sheets</span>
+      <div class="local-badge-sidebar">
+        <span>🛡️</span>
+        <span>סביבת פיתוח מקומית (מבודד)</span>
       </div>
 
       <nav class="nav-list" aria-label="ניווט ראשי">
@@ -1805,13 +1923,17 @@ button, a, [role="button"], .nav-item, .view-tab, .tasks-tab, .act-check, .kanba
         </button>
         <button class="nav-item" type="button" onclick="openStatusesModal()">➕ ניהול והרחבת סטטוסים</button>
         <button class="nav-item" type="button" onclick="openAutomationsModal()">⚡ אוטומציות מעבר עמודות</button>
-        <button class="nav-item" type="button" onclick="openUsersAndEmailModal()">🔐 מורשים ומייל משימות יומי</button>
-        <a id="openGoogleSheetLink" class="nav-item" href="#" target="_blank" rel="noreferrer" style="display: none;">📊 פתח טבלת Google Sheets</a>
+        <button class="nav-item" type="button" onclick="showToast('בגרסה המקומית פעילים מסכי הלידים, המשימות והאוטומציות')">📞 מסך שיחות</button>
+        <button class="nav-item" type="button" onclick="showToast('בגרסה המקומית פעילים מסכי הלידים, המשימות והאוטומציות')">📊 דוחות</button>
+        <button class="nav-item" type="button" onclick="showToast('בגרסה המקומית פעילים מסכי הלידים, המשימות והאוטומציות')">🎁 חבר מביא חבר</button>
+        <button class="nav-item" type="button" onclick="showToast('בגרסה המקומית פעילים מסכי הלידים, המשימות והאוטומציות')">🔄 לקוחות חוזרים</button>
       </nav>
 
       <div class="sidebar-foot">
-        <button class="nav-item" type="button" onclick="sendDailyEmailTestNow()">📩 שלח מייל משימות יומי כעת</button>
-        <button class="nav-item" type="button" onclick="resetDemoData()">🔄 איפוס נתוני דמו בשיטס</button>
+        <button class="nav-item" type="button" onclick="openUsersAndEmailModal()">🔐 מורשים ומייל יומי</button>
+        <button class="nav-item" type="button" onclick="sendDailyEmailTestNow()">📩 שלח מייל משימות יומי</button>
+        <button class="nav-item" type="button" onclick="resetDemoData()">🔄 איפוס נתוני דמו לברירת מחדל</button>
+        <button class="nav-item" type="button" onclick="handleLogout()">↩️ התנתקות</button>
       </div>
     </aside>
 
@@ -1821,32 +1943,32 @@ button, a, [role="button"], .nav-item, .view-tab, .tasks-tab, .act-check, .kanba
       <header class="topbar">
         <div class="topbar-title-wrap">
           <div class="studio-logo" title="בית היוגה — מקום שמחבר">
-            <img class="by-logo-img" alt="בית היוגה" />
+            <img src="https://doron-g.github.io/beit-hayoga-crm-demo/logo.png" alt="בית היוגה" />
           </div>
           <div class="topbar-title">
             <h1 id="pageHeaderTitle">הלידים שלי</h1>
-            <p id="pageHeaderSubtitle" class="topbar-subtitle">פייפליין המכירה של בית היוגה · מסונכרן בזמן אמת עם Google Sheets</p>
+            <p id="pageHeaderSubtitle" class="topbar-subtitle">פייפליין המכירה של בית היוגה · תומך בהרחבת סטטוסים ומעבר עמודות אוטומטי מבוסס זמן</p>
           </div>
         </div>
 
         <div class="topbar-actions">
-          <button class="btn secondary sm" type="button" onclick="openUsersAndEmailModal()" title="ניהול חשבונות ג'ימייל מורשים ומייל בוקר יומי">
-            🔐 מורשים ומייל יומי
-          </button>
           <button id="headerSwitchPageBtn" class="btn secondary" type="button" onclick="switchPage('today')">
             📋 המשימות שלי
           </button>
-          <div class="user-chip" title="מחובר באמצעות חשבון Google מורשה">
+          <div class="user-chip">
             <div class="avatar" style="background: #ffffff; border: 1px solid var(--border); padding: 2px; overflow: hidden;">
-              <img class="by-logo-img" alt="בי" style="width: 100%; height: 100%; object-fit: contain;" />
+              <img src="https://doron-g.github.io/beit-hayoga-crm-demo/logo.png" alt="בי" style="width: 100%; height: 100%; object-fit: contain;" />
             </div>
-            <span id="currentUserBadge" class="u-name">בית היוגה</span>
+            <span class="u-name">בית היוגה</span>
           </div>
         </div>
       </header>
 
-      <!-- PAGE 1: MY LEADS (/crm) -->
+      <!-- ==================================================================
+           PAGE 1: MY LEADS (/crm)
+           ================================================================== -->
       <main id="pageCrm" class="app-content">
+        <!-- Toolbar -->
         <div class="crm-toolbar">
           <div class="crm-search">
             <input
@@ -1889,10 +2011,11 @@ button, a, [role="button"], .nav-item, .view-tab, .tasks-tab, .act-check, .kanba
           </button>
         </div>
 
+        <!-- Active Automation Rules Strip & Time Simulator -->
         <div class="automation-strip">
           <div class="automation-strip-info" id="activeRulesStrip"></div>
           <div class="automation-strip-actions">
-            <button class="btn secondary sm" type="button" onclick="simulateTimeTravel(7 * 24 * 60)" title="מקדם את זמן השהייה של כל הלידים ב-7 ימים ושומר ב-Google Sheets">
+            <button class="btn secondary sm" type="button" onclick="simulateTimeTravel(7 * 24 * 60)" title="מקדם את זמן השהייה של כל הלידים ב-7 ימים כדי לבדוק מעבר אוטומטי מיד">
               ⏩ הרץ סימולציה: +7 ימים קדימה
             </button>
             <button class="btn secondary sm" type="button" onclick="simulateTimeTravel(24 * 60)" title="מקדם את זמן השהייה של כל הלידים ביום אחד">
@@ -1904,8 +2027,10 @@ button, a, [role="button"], .nav-item, .view-tab, .tasks-tab, .act-check, .kanba
           </div>
         </div>
 
+        <!-- Kanban View -->
         <section id="kanbanView" class="kanban" aria-label="לוח לידים"></section>
 
+        <!-- List View -->
         <section id="listView" class="list-view-container" style="display: none;">
           <div class="filters-bar">
             <div class="filter-group">
@@ -1947,8 +2072,11 @@ button, a, [role="button"], .nav-item, .view-tab, .tasks-tab, .act-check, .kanba
         </section>
       </main>
 
-      <!-- PAGE 2: MY TASKS ("📋 המשימות שלי" - /today) -->
+      <!-- ==================================================================
+           PAGE 2: MY TASKS ("📋 המשימות שלי" - /today)
+           ================================================================== -->
       <main id="pageToday" class="app-content" style="display: none;">
+        <!-- Tasks Sub-navigation Tabs -->
         <nav class="tasks-tabs" aria-label="תצוגת משימות">
           <button id="taskTab_today" class="tasks-tab active" type="button" onclick="setTasksTab('today')">
             <span>היום</span>
@@ -1971,6 +2099,7 @@ button, a, [role="button"], .nav-item, .view-tab, .tasks-tab, .act-check, .kanba
           </button>
         </nav>
 
+        <!-- Tasks Filters & Actions Bar -->
         <div class="tasks-filters">
           <div id="tasksRangeInputs" class="tasks-range" style="display: none;">
             <label>
@@ -1998,15 +2127,12 @@ button, a, [role="button"], .nav-item, .view-tab, .tasks-tab, .act-check, .kanba
 
           <span id="tasksSummaryCount" class="toolbar-count">0 פעילויות · 0 פתוחות</span>
 
-          <button class="btn secondary" type="button" onclick="sendDailyEmailTestNow()">
-            📩 שלח מייל משימות להיום כעת
-          </button>
-
           <button class="btn" type="button" onclick="openNewTaskModal()">
             + פעילות / משימה חדשה
           </button>
         </div>
 
+        <!-- Tasks Table or Empty State -->
         <div id="tasksContentArea"></div>
       </main>
     </div>
@@ -2021,7 +2147,7 @@ button, a, [role="button"], .nav-item, .view-tab, .tasks-tab, .act-check, .kanba
       </div>
       <div class="modal-body">
         <p style="margin: 0; color: var(--muted); font-size: 13.5px;">
-          כאן תוכל להוסיף סטטוסים חדשים (למשל <strong>"לאחר שבוע"</strong>, <strong>"מעקב 30 יום"</strong>, <strong>"ממתין לתשלום"</strong>), לשנות את שמם, צבעם, סדר ההופעה שלהם, או לקבוע אם יוצגו כעמודה בלוח ה-Kanban. כל שינוי נשמר אוטומטית ב-Google Sheets.
+          כאן תוכל להוסיף סטטוסים חדשים (למשל <strong>"לאחר שבוע"</strong>, <strong>"מעקב 30 יום"</strong>, <strong>"ממתין לתשלום"</strong>), לשנות את שמם, צבעם, סדר ההופעה שלהם, או לקבוע אם יוצגו כעמודה בלוח ה-Kanban.
         </p>
 
         <form id="addStatusForm" class="manager-row" style="background: #eff8ff; border-color: #b9e0fe;" onsubmit="handleAddStatus(event)">
@@ -2064,7 +2190,9 @@ button, a, [role="button"], .nav-item, .view-tab, .tasks-tab, .act-check, .kanba
       </div>
       <div class="modal-body">
         <p style="margin: 0; color: var(--muted); font-size: 13.5px;">
-          הגדר חוקים שמעבירים ליד באופן אוטומטי מעמודה אחת לעמודה אחרת לאחר פרק זמן שהגדרת. החוקים נשמרים בלשונית <code>Rules</code> ב-Google Sheets ורצים גם כשהדפדפן סגור!
+          הגדר חוקים שמעבירים ליד באופן אוטומטי מעמודה אחת לעמודה אחרת לאחר פרק זמן שהגדרת.
+          <br />
+          <em>דוגמא: אם ליד הועבר לסטטוס <strong>"מכירה"</strong> ⬅️ אחרי <strong>1 שבועות</strong> (או ימים/שעות/שניות לבדיקה) ⬅️ העבר אותו אוטומטית לעמודה <strong>"לאחר שבוע"</strong>.</em>
         </p>
 
         <form id="addRuleForm" style="background: #f5f3ff; border: 1px solid #ddd6fe; padding: 14px; border-radius: 12px;" onsubmit="handleAddRule(event)">
@@ -2105,7 +2233,7 @@ button, a, [role="button"], .nav-item, .view-tab, .tasks-tab, .act-check, .kanba
 
           <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
             <span style="font-size: 12px; color: var(--muted);">
-              💡 ניתן לבדוק כל חוק מיד באמצעות כפתור <strong>"⏩ הרץ סימולציה: +7 ימים"</strong> בסרגל העליון.
+              💡 ניתן לבדוק כל חוק מיד באמצעות כפתור <strong>"⏩ הרץ סימולציה: +7 ימים"</strong> בסרגל העליון, או להגדיר שניות ולראות את המעבר מול העיניים.
             </span>
             <button class="btn" type="submit">+ שמור והפעל חוק</button>
           </div>
@@ -2172,7 +2300,7 @@ button, a, [role="button"], .nav-item, .view-tab, .tasks-tab, .act-check, .kanba
     </div>
   </div>
 
-  <!-- MODAL 4: Create New Task / Activity -->
+  <!-- MODAL 4: Create New Task / Activity from My Tasks screen -->
   <div id="newTaskModal" class="modal-backdrop" onclick="if(event.target===this) closeNewTaskModal()">
     <div class="modal-panel" style="max-width: 500px;">
       <div class="modal-head">
@@ -2215,70 +2343,6 @@ button, a, [role="button"], .nav-item, .view-tab, .tasks-tab, .act-check, .kanba
     </div>
   </div>
 
-  <!-- MODAL 5: Authorized Gmail Users & Daily Email Trigger Settings -->
-  <div id="usersModal" class="modal-backdrop" onclick="if(event.target===this) closeUsersAndEmailModal()">
-    <div class="modal-panel" style="max-width: 680px;">
-      <div class="modal-head">
-        <h2>🔐 ניהול חשבונות ג'ימייל מורשים ומייל משימות יומי</h2>
-        <button class="btn secondary sm" type="button" onclick="closeUsersAndEmailModal()">✕</button>
-      </div>
-      <div class="modal-body">
-        <!-- Daily Email Trigger Card -->
-        <div style="background: #ecfdf3; border: 1px solid #a6f4c5; padding: 14px 16px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-          <div>
-            <div style="font-weight: 700; color: #027a48; font-size: 14.5px;">📩 אוטומציית מייל משימות פתוחות יומי (08:00 בבוקר)</div>
-            <div id="triggersStatusLabel" style="font-size: 12.5px; color: #027a48; margin-top: 2px;">
-              שולח בכל בוקר סיכום של המשימות הפתוחות להיום + משימות שלא בוצעו לכל מי שמסומן למטה.
-            </div>
-          </div>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button class="btn sm" style="background: #16b364;" type="button" onclick="installDailyTriggersNow()">
-              ⏰ הפעל תזמון יומי אוטומטי (08:00)
-            </button>
-            <button class="btn secondary sm" type="button" onclick="sendDailyEmailTestNow()">
-              📩 שלח מייל בדיקה כעת
-            </button>
-          </div>
-        </div>
-
-        <p style="margin: 0; color: var(--muted); font-size: 13.5px;">
-          רק כתובות הג'ימייל שמופיעות ברשימה זו (ובלשונית <code>AllowedUsers</code> בגוגל שיטס) מורשות להיכנס למערכת.
-          <strong>חשוב:</strong> כאשר אתה מוסיף חשבון ג'ימייל חדש, לחץ גם על כפתור <strong>Share (שתף)</strong> בקובץ ה-Google Sheets ושתף איתו את הגיליון.
-        </p>
-
-        <form class="manager-row" style="background: #eff8ff; border-color: #b9e0fe;" onsubmit="handleAddAllowedUser(event)">
-          <input
-            id="newAllowedEmail"
-            type="email"
-            class="input-control"
-            dir="ltr"
-            style="flex: 1; height: 36px;"
-            placeholder="כתובת ג'ימייל חדשה (למשל user@gmail.com)…"
-            required
-          />
-          <input
-            id="newAllowedName"
-            type="text"
-            class="input-control"
-            style="width: 150px; height: 36px;"
-            placeholder="שם התצוגה…"
-            required
-          />
-          <label class="checkbox-label">
-            <input id="newAllowedDailyMail" type="checkbox" checked />
-            <span>מייל בוקר יומי</span>
-          </label>
-          <button class="btn sm" type="submit">+ הוסף מורשה</button>
-        </form>
-
-        <div id="allowedUsersList" class="list-manager"></div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn" type="button" onclick="closeUsersAndEmailModal()">סגור</button>
-      </div>
-    </div>
-  </div>
-
   <!-- DRAWER: Lead Detail & Timeline -->
   <div id="leadDrawerBackdrop" class="drawer-backdrop" onclick="if(event.target===this) closeLeadDrawer()">
     <aside class="drawer" aria-label="פרטי ליד">
@@ -2293,12 +2357,6 @@ button, a, [role="button"], .nav-item, .view-tab, .tasks-tab, .act-check, .kanba
   <!-- Toast Container -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <script>
-    const LOGO_DATA_URI = "https://doron-g.github.io/beit-hayoga-crm-demo/logo.png";
-    document.querySelectorAll(".by-logo-img").forEach((img) => {
-      img.src = LOGO_DATA_URI;
-    });
-  </script>
   <script>
 /**
  * בית היוגה — מערכת ניהול לידים ומשימות (CRM)
@@ -4280,6 +4338,153 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-  </script>
+
+// ============================================================================
+// Login Gate for Authorized Gmail Accounts (dgescheidt3@gmail.com & lightsofyoga@gmail.com)
+// ============================================================================
+
+const AUTH_SESSION_KEY = "by_crm_logged_in_user_v1";
+
+function checkExistingLoginSession() {
+  try {
+    const raw = localStorage.getItem(AUTH_SESSION_KEY);
+    if (raw) {
+      const user = JSON.parse(raw);
+      if (user && user.email) {
+        unlockAppForUser(user);
+        return;
+      }
+    }
+  } catch (e) {}
+  const gate = document.getElementById("loginGateOverlay");
+  if (gate) gate.classList.remove("hidden");
+}
+
+function unlockAppForUser(user) {
+  const gate = document.getElementById("loginGateOverlay");
+  if (gate) gate.classList.add("hidden");
+  const badge = document.getElementById("currentUserBadge");
+  if (badge) badge.textContent = user.name || user.email;
+}
+
+function handleLoginSubmit(event) {
+  event.preventDefault();
+  const emailInput = document.getElementById("loginEmailInput");
+  const passInput = document.getElementById("loginPassInput");
+  const errBox = document.getElementById("loginErrorBox");
+  const submitBtn = document.getElementById("loginSubmitBtn");
+
+  const email = (emailInput.value || "").trim().toLowerCase();
+  const pass = (passInput.value || "").trim();
+
+  errBox.style.display = "none";
+
+  const localAllowed = state.allowedUsers && state.allowedUsers.length > 0
+    ? state.allowedUsers
+    : [
+        { email: "dgescheidt3@gmail.com", name: "דורון (מנהל מערכת)", accessCode: "nati1234", receiveDailyEmail: true },
+        { email: "lightsofyoga@gmail.com", name: "בית היוגה", accessCode: "nati1234", receiveDailyEmail: true },
+      ];
+
+  if (typeof google !== "undefined" && google.script && google.script.run) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "מאמת חשבון מול Google Sheets…";
+    google.script.run
+      .withSuccessHandler((res) => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "כניסה למערכת";
+        if (res && res.ok) {
+          localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(res.user));
+          unlockAppForUser(res.user);
+          showToast(`👋 שלום ${res.user.name}! התחברת בהצלחה`);
+        } else {
+          errBox.textContent = (res && res.error) || "גישה נדחתה";
+          errBox.style.display = "block";
+        }
+      })
+      .withFailureHandler((err) => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "כניסה למערכת";
+        errBox.textContent = "שגיאת אימות: " + (err.message || err);
+        errBox.style.display = "block";
+      })
+      .apiVerifyLogin(email, pass);
+  } else {
+    const found = localAllowed.find((u) => (u.email || "").trim().toLowerCase() === email);
+    if (!found) {
+      errBox.textContent = `⛔ החשבון ${email} אינו מופיע ברשימת המורשים של בית היוגה.`;
+      errBox.style.display = "block";
+      return;
+    }
+    const expected = String(found.accessCode || "nati1234").trim();
+    if (expected && pass !== expected) {
+      errBox.textContent = "סיסמה / קוד גישה שגויים";
+      errBox.style.display = "block";
+      return;
+    }
+    const user = { email: found.email, name: found.name || found.email };
+    localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(user));
+    unlockAppForUser(user);
+    showToast(`👋 שלום ${user.name}! התחברת בהצלחה`);
+  }
+}
+
+function handleLogout() {
+  localStorage.removeItem(AUTH_SESSION_KEY);
+  const gate = document.getElementById("loginGateOverlay");
+  if (gate) gate.classList.remove("hidden");
+  showToast("🔒 התנתקת מהמערכת");
+}
+
+// Override sendDailyEmailTestNow to open the rich Daily Digest Email Preview & Gmail Compose
+sendDailyEmailTestNow = function () {
+  const todayKey = getOffsetDateKey(0);
+  const openToday = (state.tasks || []).filter((t) => !t.done && t.dueDate === todayKey);
+  const overdue = (state.tasks || []).filter((t) => !t.done && t.dueDate < todayKey);
+  const recipients = (
+    state.allowedUsers && state.allowedUsers.length > 0
+      ? state.allowedUsers.filter((u) => u.receiveDailyEmail !== false).map((u) => u.email)
+      : ["dgescheidt3@gmail.com", "lightsofyoga@gmail.com"]
+  ).join(",");
+
+  const subject = `📋 בית היוגה · המשימות הפתוחות להיום (${formatDateDisplay(todayKey)}) — ${openToday.length} להיום, ${overdue.length} באיחור`;
+
+  const lines = [];
+  lines.push(`שלום,`);
+  lines.push(`להלן סיכום המשימות והשיחות הפתוחות במערכת בית היוגה להיום (${formatDateDisplay(todayKey)}):`);
+  lines.push(``);
+  lines.push(`🟢 משימות להיום (${openToday.length}):`);
+  if (openToday.length === 0) {
+    lines.push(`• אין משימות פתוחות להיום`);
+  } else {
+    openToday.forEach((t) => {
+      const lead = getLeadById(t.leadId);
+      const typeInfo = TASK_TYPE_META[t.type] || TASK_TYPE_META.task;
+      lines.push(`• [${t.dueTime || "10:00"}] ${typeInfo.label} — ${lead ? lead.name : "ליד"} (${lead ? lead.phone : ""})${t.note ? " | " + t.note : ""}`);
+    });
+  }
+  lines.push(``);
+  lines.push(`🔴 משימות שלא בוצעו / באיחור (${overdue.length}):`);
+  if (overdue.length === 0) {
+    lines.push(`• אין משימות באיחור 🎉`);
+  } else {
+    overdue.forEach((t) => {
+      const lead = getLeadById(t.leadId);
+      const typeInfo = TASK_TYPE_META[t.type] || TASK_TYPE_META.task;
+      lines.push(`• [${formatDateDisplay(t.dueDate)} ${t.dueTime || ""}] ${typeInfo.label} — ${lead ? lead.name : "ליד"} (${lead ? lead.phone : ""})${t.note ? " | " + t.note : ""}`);
+    });
+  }
+
+  const bodyText = lines.join("\n");
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipients)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`;
+  window.open(gmailUrl, "_blank");
+  showToast(`📩 נפתח חלון שליחת דו"ח המשימות היומי בג'ימייל ל: ${recipients}`);
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  checkExistingLoginSession();
+});
+
+</script>
 </body>
 </html>

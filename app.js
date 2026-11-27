@@ -1977,3 +1977,150 @@ document.addEventListener("DOMContentLoaded", () => {
       .apiGetInitialState();
   }
 });
+
+
+// ============================================================================
+// Login Gate for Authorized Gmail Accounts (dgescheidt3@gmail.com & lightsofyoga@gmail.com)
+// ============================================================================
+
+const AUTH_SESSION_KEY = "by_crm_logged_in_user_v1";
+
+function checkExistingLoginSession() {
+  try {
+    const raw = localStorage.getItem(AUTH_SESSION_KEY);
+    if (raw) {
+      const user = JSON.parse(raw);
+      if (user && user.email) {
+        unlockAppForUser(user);
+        return;
+      }
+    }
+  } catch (e) {}
+  const gate = document.getElementById("loginGateOverlay");
+  if (gate) gate.classList.remove("hidden");
+}
+
+function unlockAppForUser(user) {
+  const gate = document.getElementById("loginGateOverlay");
+  if (gate) gate.classList.add("hidden");
+  const badge = document.getElementById("currentUserBadge");
+  if (badge) badge.textContent = user.name || user.email;
+}
+
+function handleLoginSubmit(event) {
+  event.preventDefault();
+  const emailInput = document.getElementById("loginEmailInput");
+  const passInput = document.getElementById("loginPassInput");
+  const errBox = document.getElementById("loginErrorBox");
+  const submitBtn = document.getElementById("loginSubmitBtn");
+
+  const email = (emailInput.value || "").trim().toLowerCase();
+  const pass = (passInput.value || "").trim();
+
+  errBox.style.display = "none";
+
+  const localAllowed = state.allowedUsers && state.allowedUsers.length > 0
+    ? state.allowedUsers
+    : [
+        { email: "dgescheidt3@gmail.com", name: "דורון (מנהל מערכת)", accessCode: "nati1234", receiveDailyEmail: true },
+        { email: "lightsofyoga@gmail.com", name: "בית היוגה", accessCode: "nati1234", receiveDailyEmail: true },
+      ];
+
+  if (typeof google !== "undefined" && google.script && google.script.run) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "מאמת חשבון מול Google Sheets…";
+    google.script.run
+      .withSuccessHandler((res) => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "כניסה למערכת";
+        if (res && res.ok) {
+          localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(res.user));
+          unlockAppForUser(res.user);
+          showToast(`👋 שלום ${res.user.name}! התחברת בהצלחה`);
+        } else {
+          errBox.textContent = (res && res.error) || "גישה נדחתה";
+          errBox.style.display = "block";
+        }
+      })
+      .withFailureHandler((err) => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "כניסה למערכת";
+        errBox.textContent = "שגיאת אימות: " + (err.message || err);
+        errBox.style.display = "block";
+      })
+      .apiVerifyLogin(email, pass);
+  } else {
+    const found = localAllowed.find((u) => (u.email || "").trim().toLowerCase() === email);
+    if (!found) {
+      errBox.textContent = `⛔ החשבון ${email} אינו מופיע ברשימת המורשים של בית היוגה.`;
+      errBox.style.display = "block";
+      return;
+    }
+    const expected = String(found.accessCode || "nati1234").trim();
+    if (expected && pass !== expected) {
+      errBox.textContent = "סיסמה / קוד גישה שגויים";
+      errBox.style.display = "block";
+      return;
+    }
+    const user = { email: found.email, name: found.name || found.email };
+    localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(user));
+    unlockAppForUser(user);
+    showToast(`👋 שלום ${user.name}! התחברת בהצלחה`);
+  }
+}
+
+function handleLogout() {
+  localStorage.removeItem(AUTH_SESSION_KEY);
+  const gate = document.getElementById("loginGateOverlay");
+  if (gate) gate.classList.remove("hidden");
+  showToast("🔒 התנתקת מהמערכת");
+}
+
+// Override sendDailyEmailTestNow to open the rich Daily Digest Email Preview & Gmail Compose
+sendDailyEmailTestNow = function () {
+  const todayKey = getOffsetDateKey(0);
+  const openToday = (state.tasks || []).filter((t) => !t.done && t.dueDate === todayKey);
+  const overdue = (state.tasks || []).filter((t) => !t.done && t.dueDate < todayKey);
+  const recipients = (
+    state.allowedUsers && state.allowedUsers.length > 0
+      ? state.allowedUsers.filter((u) => u.receiveDailyEmail !== false).map((u) => u.email)
+      : ["dgescheidt3@gmail.com", "lightsofyoga@gmail.com"]
+  ).join(",");
+
+  const subject = `📋 בית היוגה · המשימות הפתוחות להיום (${formatDateDisplay(todayKey)}) — ${openToday.length} להיום, ${overdue.length} באיחור`;
+
+  const lines = [];
+  lines.push(`שלום,`);
+  lines.push(`להלן סיכום המשימות והשיחות הפתוחות במערכת בית היוגה להיום (${formatDateDisplay(todayKey)}):`);
+  lines.push(``);
+  lines.push(`🟢 משימות להיום (${openToday.length}):`);
+  if (openToday.length === 0) {
+    lines.push(`• אין משימות פתוחות להיום`);
+  } else {
+    openToday.forEach((t) => {
+      const lead = getLeadById(t.leadId);
+      const typeInfo = TASK_TYPE_META[t.type] || TASK_TYPE_META.task;
+      lines.push(`• [${t.dueTime || "10:00"}] ${typeInfo.label} — ${lead ? lead.name : "ליד"} (${lead ? lead.phone : ""})${t.note ? " | " + t.note : ""}`);
+    });
+  }
+  lines.push(``);
+  lines.push(`🔴 משימות שלא בוצעו / באיחור (${overdue.length}):`);
+  if (overdue.length === 0) {
+    lines.push(`• אין משימות באיחור 🎉`);
+  } else {
+    overdue.forEach((t) => {
+      const lead = getLeadById(t.leadId);
+      const typeInfo = TASK_TYPE_META[t.type] || TASK_TYPE_META.task;
+      lines.push(`• [${formatDateDisplay(t.dueDate)} ${t.dueTime || ""}] ${typeInfo.label} — ${lead ? lead.name : "ליד"} (${lead ? lead.phone : ""})${t.note ? " | " + t.note : ""}`);
+    });
+  }
+
+  const bodyText = lines.join("\n");
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipients)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`;
+  window.open(gmailUrl, "_blank");
+  showToast(`📩 נפתח חלון שליחת דו"ח המשימות היומי בג'ימייל ל: ${recipients}`);
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  checkExistingLoginSession();
+});

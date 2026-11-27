@@ -1,23 +1,16 @@
+/** @OnlyCurrentDoc */
 /**
  * ============================================================================
  * בית היוגה — מערכת ניהול לידים ומשימות (Google Sheets CRM Backend)
  * ============================================================================
- * קובץ שרת: Code.gs
- *
- * כולל:
- * 1. אימות חשבונות גוגל מורשים (Whitelist) — ברירת מחדל: dgescheidt3@gmail.com
- *    + ניהול משתמשים מורשים מתוך לשונית AllowedUsers בגוגל שיטס או ישירות מהממשק!
- * 2. הקמה אוטומטית של 5 הלשוניות בגוגל שיטס:
- *    - Leads (לידים)
- *    - Tasks (משימות ופעילויות)
- *    - Stages (עמודות וסטטוסים)
- *    - Rules (חוקי אוטומציית מעבר עמודות לפי זמן)
- *    - AllowedUsers (משתמשים מורשים + הגדרת קבלת מייל משימות יומי)
- * 3. מנוע אוטומציית מעבר עמודות מבוסס זמן שרץ גם בשרתי גוגל כל שעה.
- * 4. מנוע דיוור מייל יומי מעוצב (HTML RTL) בכל בוקר עם המשימות הפתוחות להיום + משימות באיחור.
+ * מורשים:
+ * 1. dgescheidt3@gmail.com (דורון)
+ * 2. lightsofyoga@gmail.com (בית היוגה)
+ * + כל חשבון נוסף שיתווסף ללשונית AllowedUsers בגוגל שיטס.
  */
 
 const PRIMARY_OWNER_EMAIL = "dgescheidt3@gmail.com";
+const SECONDARY_OWNER_EMAIL = "lightsofyoga@gmail.com";
 
 const SHEET_NAMES = {
   LEADS: "Leads",
@@ -52,24 +45,20 @@ const UNIT_LABELS = {
   weeks: "שבועות",
 };
 
-// ============================================================================
-// 1. Web App Entry Point & Google Account Authorization
-// ============================================================================
+/**
+ * הרצה ראשונית להקמת הלשוניות בשיטס
+ */
+function setupDatabaseNow() {
+  ensureDatabaseInitialized_();
+}
 
 function doGet(e) {
   ensureDatabaseInitialized_();
 
-  const auth = checkUserAuthorization_();
-  if (!auth.authorized) {
-    return HtmlService.createHtmlOutput(renderAccessDeniedHtml_(auth.email))
-      .setTitle("גישה חסומה · בית היוגה CRM")
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  }
-
   const template = HtmlService.createTemplateFromFile("index");
-  template.currentUserEmail = auth.email;
-  template.currentUserName = auth.name || auth.email;
-  template.spreadsheetUrl = SpreadsheetApp.getActiveSpreadsheet().getUrl();
+  template.currentUserEmail = "";
+  template.currentUserName = "בית היוגה";
+  template.spreadsheetUrl = "";
 
   return template
     .evaluate()
@@ -78,97 +67,64 @@ function doGet(e) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-function checkUserAuthorization_() {
-  const activeEmail = (Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || "")
-    .trim()
-    .toLowerCase();
+// ============================================================================
+// 1. Login & Authorization API (Checks against AllowedUsers in Google Sheets)
+// ============================================================================
 
-  const allowedUsers = getAllowedUsersList_();
+function apiVerifyLogin(emailInput, passInput) {
+  ensureDatabaseInitialized_();
+  const cleanEmail = String(emailInput || "").trim().toLowerCase();
+  const cleanPass = String(passInput || "").trim();
 
-  if (!activeEmail) {
-    return { authorized: false, email: "לא זוהה חשבון גוגל מחובר" };
+  if (!cleanEmail) {
+    return { ok: false, error: "נא להזין כתובת ג'ימייל" };
   }
 
-  if (activeEmail === PRIMARY_OWNER_EMAIL.toLowerCase()) {
-    return { authorized: true, email: activeEmail, name: "דורון (מנהל מערכת)" };
+  const users = readSheetObjects_(SHEET_NAMES.USERS);
+  const found = users.find((u) => String(u.email || "").trim().toLowerCase() === cleanEmail);
+
+  if (!found) {
+    return {
+      ok: false,
+      error: "⛔ החשבון " + cleanEmail + " אינו מופיע ברשימת המורשים של מערכת בית היוגה.",
+    };
   }
 
-  const found = allowedUsers.find((u) => (u.email || "").trim().toLowerCase() === activeEmail);
-  if (found) {
-    return { authorized: true, email: activeEmail, name: found.name || activeEmail };
+  const expectedPass = String(found.accessCode || "nati1234").trim();
+  if (expectedPass && cleanPass !== expectedPass) {
+    return {
+      ok: false,
+      error: "קוד הגישה שגוי עבור " + cleanEmail,
+    };
   }
 
-  return { authorized: false, email: activeEmail };
-}
-
-function assertAuthorized_() {
-  const auth = checkUserAuthorization_();
-  if (!auth.authorized) {
-    throw new Error("אין הרשאת גישה לחשבון: " + auth.email);
-  }
-  return auth;
-}
-
-function renderAccessDeniedHtml_(email) {
-  return `<!DOCTYPE html>
-<html lang="he" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body { font-family: 'Assistant', 'Segoe UI', sans-serif; background: #0f172a; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; text-align: center; }
-    .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 32px 28px; max-width: 440px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
-    .icon { font-size: 46px; margin-bottom: 12px; }
-    h1 { margin: 0 0 10px; font-size: 22px; }
-    p { color: #94a3b8; font-size: 14.5px; line-height: 1.6; margin: 0 0 18px; }
-    .email-pill { background: #0f172a; border: 1px solid #475569; padding: 8px 14px; border-radius: 999px; font-family: monospace; color: #f87171; display: inline-block; margin-bottom: 18px; direction: ltr; }
-    .btn { display: inline-block; background: #2e90fa; color: #fff; text-decoration: none; padding: 10px 20px; border-radius: 10px; font-weight: 700; font-size: 14px; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="icon">🔒</div>
-    <h1>הגישה למערכת בית היוגה מוגבלת</h1>
-    <p>המערכת פתוחה אך ורק לחשבונות ג'ימייל מורשים שהוגדרו על ידי מנהל המערכת.</p>
-    <div class="email-pill">${email || "חשבון לא מזוהה"}</div>
-    <p>אם יש לך חשבון ג'ימייל מורשה נוסף במכשיר זה, החלף חשבון גוגל ונסה שוב:</p>
-    <a class="btn" href="https://accounts.google.com/AccountChooser" target="_top">החלף חשבון Google</a>
-  </div>
-</body>
-</html>`;
+  return {
+    ok: true,
+    user: {
+      email: found.email,
+      name: found.name || found.email,
+    },
+  };
 }
 
 // ============================================================================
 // 2. Client-Callable API Functions (google.script.run)
 // ============================================================================
 
-/**
- * Loads the complete CRM state from Google Sheets
- */
 function apiGetInitialState() {
-  const auth = assertAuthorized_();
   ensureDatabaseInitialized_();
-
-  // Evaluate any pending time-based transitions on load
   runTimeBasedAutomationsEngine_();
 
   return {
-    currentUser: auth,
-    spreadsheetUrl: SpreadsheetApp.getActiveSpreadsheet().getUrl(),
     stages: readSheetObjects_(SHEET_NAMES.STAGES),
     rules: readSheetObjects_(SHEET_NAMES.RULES),
     leads: readSheetObjects_(SHEET_NAMES.LEADS),
     tasks: readSheetObjects_(SHEET_NAMES.TASKS),
     allowedUsers: readSheetObjects_(SHEET_NAMES.USERS),
-    triggersInstalled: checkIfTriggersInstalled_(),
   };
 }
 
-/**
- * Saves the updated CRM state back to Google Sheets with LockService protection
- */
 function apiSyncState(payload) {
-  const auth = assertAuthorized_();
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
 
@@ -190,24 +146,19 @@ function apiSyncState(payload) {
       writeSheetObjects_(SHEET_NAMES.TASKS, ["id", "leadId", "type", "dueDate", "dueTime", "note", "done"], payload.tasks);
     }
     if (payload.allowedUsers) {
-      writeSheetObjects_(SHEET_NAMES.USERS, ["email", "name", "receiveDailyEmail", "addedAt"], payload.allowedUsers);
+      writeSheetObjects_(SHEET_NAMES.USERS, ["email", "name", "accessCode", "receiveDailyEmail", "addedAt"], payload.allowedUsers);
     }
 
     return {
       ok: true,
       syncedAt: new Date().toISOString(),
-      syncedBy: auth.email,
     };
   } finally {
     lock.releaseLock();
   }
 }
 
-/**
- * Resets the Google Sheets database to default demo data
- */
 function apiResetDemoData() {
-  assertAuthorized_();
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
@@ -219,69 +170,19 @@ function apiResetDemoData() {
 }
 
 /**
- * Sends the daily tasks summary email immediately (for instant testing or manual trigger)
+ * מחזיר את נתוני המייל היומי המעוצב (נושא, נמענים וגוף ה-HTML)
+ * כדי להציג תצוגה מקדימה חיה או לשלוח אותו בלחיצה אחת!
  */
-function apiSendDailyEmailNow() {
-  const auth = assertAuthorized_();
-  const result = sendDailyOpenTasksEmail();
-  return result;
-}
-
-/**
- * Installs automatic daily morning email trigger (08:00) and hourly column-transition trigger
- */
-function apiInstallAutomationTriggers() {
-  assertAuthorized_();
-
-  // Remove existing duplicate triggers first
-  const existing = ScriptApp.getProjectTriggers();
-  existing.forEach((t) => {
-    const fn = t.getHandlerFunction();
-    if (fn === "sendDailyOpenTasksEmail" || fn === "runTimeBasedAutomationsCron") {
-      ScriptApp.deleteTrigger(t);
-    }
-  });
-
-  // 1. Daily morning email at 08:00 AM Israel time
-  ScriptApp.newTrigger("sendDailyOpenTasksEmail")
-    .timeBased()
-    .everyDays(1)
-    .atHour(8)
-    .create();
-
-  // 2. Hourly background check for time-based stage transitions (e.g. "מכירה" -> "לאחר שבוע")
-  ScriptApp.newTrigger("runTimeBasedAutomationsCron")
-    .timeBased()
-    .everyHours(1)
-    .create();
-
-  return {
-    ok: true,
-    triggersInstalled: true,
-    message: "הופעלו בהצלחה: מייל משימות יומי בכל בוקר (08:00) + בדיקת מעבר עמודות אוטומטית בכל שעה!",
-  };
-}
-
-function checkIfTriggersInstalled_() {
-  try {
-    const triggers = ScriptApp.getProjectTriggers();
-    return triggers.some((t) => t.getHandlerFunction() === "sendDailyOpenTasksEmail");
-  } catch (e) {
-    return false;
-  }
-}
-
-// ============================================================================
-// 3. Daily Open Tasks Email Digest ("מייל משימות פתוחות להיום")
-// ============================================================================
-
-function sendDailyOpenTasksEmail() {
+function apiBuildDailyDigestData() {
   ensureDatabaseInitialized_();
+  return buildDailyDigestPayload_();
+}
 
+function buildDailyDigestPayload_() {
   const tasks = readSheetObjects_(SHEET_NAMES.TASKS);
   const leads = readSheetObjects_(SHEET_NAMES.LEADS);
   const stages = readSheetObjects_(SHEET_NAMES.STAGES);
-  const users = getAllowedUsersList_();
+  const users = readSheetObjects_(SHEET_NAMES.USERS);
 
   const todayKey = getOffsetDateKey_(0);
   const todayDisplay = formatDateDisplay_(todayKey);
@@ -300,13 +201,35 @@ function sendDailyOpenTasksEmail() {
     .filter(Boolean);
 
   if (recipients.length === 0) {
-    recipients.push(PRIMARY_OWNER_EMAIL);
+    recipients.push(PRIMARY_OWNER_EMAIL, SECONDARY_OWNER_EMAIL);
   }
 
-  const webAppUrl = ScriptApp.getService().getUrl() || SpreadsheetApp.getActiveSpreadsheet().getUrl();
-  const totalOpenCount = openTodayTasks.length + overdueTasks.length;
-
   const subject = `📋 בית היוגה · המשימות הפתוחות שלך להיום (${todayDisplay}) — ${openTodayTasks.length} להיום, ${overdueTasks.length} באיחור`;
+
+  const plainLines = [];
+  plainLines.push(`בית היוגה · סיכום המשימות הפתוחות להיום (${todayDisplay})`);
+  plainLines.push(`====================================================`);
+  plainLines.push(`🟢 משימות להיום (${openTodayTasks.length}):`);
+  if (openTodayTasks.length === 0) {
+    plainLines.push(`- אין משימות פתוחות להיום`);
+  } else {
+    openTodayTasks.forEach((t) => {
+      const lead = leads.find((l) => l.id === t.leadId);
+      const typeLabel = TASK_TYPE_LABELS[t.type] || "משימה";
+      plainLines.push(`• [${t.dueTime || "10:00"}] ${typeLabel} — ${lead ? lead.name : "ליד"} (${lead ? lead.phone : ""}) ${t.note ? "| " + t.note : ""}`);
+    });
+  }
+  plainLines.push(``);
+  plainLines.push(`🔴 משימות באיחור / לא בוצעו (${overdueTasks.length}):`);
+  if (overdueTasks.length === 0) {
+    plainLines.push(`- אין משימות באיחור 🎉`);
+  } else {
+    overdueTasks.forEach((t) => {
+      const lead = leads.find((l) => l.id === t.leadId);
+      const typeLabel = TASK_TYPE_LABELS[t.type] || "משימה";
+      plainLines.push(`• [${formatDateDisplay_(t.dueDate)} ${t.dueTime || ""}] ${typeLabel} — ${lead ? lead.name : "ליד"} (${lead ? lead.phone : ""}) ${t.note ? "| " + t.note : ""}`);
+    });
+  }
 
   const buildTaskRowsHtml = (list, isOverdueSection) => {
     if (list.length === 0) {
@@ -345,7 +268,7 @@ function sendDailyOpenTasksEmail() {
               }
               ${
                 waPhone
-                  ? `<a href="https://wa.me/${waPhone}" style="background: #ecfdf3; color: #027a48; border: 1px solid #a6f4c5; padding: 3px 8px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 700;">💬 וואטסאפ</a>`
+                  ? `<a href="https://wa.me/${waPhone}" target="_blank" style="background: #ecfdf3; color: #027a48; border: 1px solid #a6f4c5; padding: 3px 8px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 700;">💬 וואטסאפ</a>`
                   : ""
               }
             </td>
@@ -356,85 +279,61 @@ function sendDailyOpenTasksEmail() {
   };
 
   const htmlBody = `
-    <div dir="rtl" style="font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background: #f7f8fa; padding: 24px 14px; color: #1f2937; text-align: right;">
-      <div style="max-width: 720px; margin: 0 auto; background: #ffffff; border: 1px solid #e4e7ec; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(16,24,40,0.06);">
-        
-        <!-- Header -->
-        <div style="background: #0f172a; color: #ffffff; padding: 20px 24px;">
-          <div style="font-size: 13px; color: #fde68a; font-weight: 700; margin-bottom: 4px;">בית היוגה · מקום שמחבר</div>
-          <h1 style="margin: 0; font-size: 22px;">📋 סיכום המשימות הפתוחות שלך להיום (${todayDisplay})</h1>
-          <p style="margin: 6px 0 0; color: #cbd5e1; font-size: 14px;">
-            סה"כ מחכות לך כרגע <strong>${openTodayTasks.length} משימות להיום</strong> ו-<strong>${overdueTasks.length} משימות באיחור</strong> מימים קודמים.
+    <div dir="rtl" style="font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background: #f7f8fa; padding: 18px 12px; color: #1f2937; text-align: right;">
+      <div style="max-width: 700px; margin: 0 auto; background: #ffffff; border: 1px solid #e4e7ec; border-radius: 16px; overflow: hidden;">
+        <div style="background: #0f172a; color: #ffffff; padding: 18px 22px;">
+          <div style="font-size: 12.5px; color: #fde68a; font-weight: 700; margin-bottom: 4px;">בית היוגה · מקום שמחבר</div>
+          <h2 style="margin: 0; font-size: 19px;">📋 המשימות הפתוחות שלך להיום (${todayDisplay})</h2>
+          <p style="margin: 5px 0 0; color: #cbd5e1; font-size: 13.5px;">
+            מחכות לך <strong>${openTodayTasks.length} משימות להיום</strong> ו-<strong>${overdueTasks.length} משימות באיחור</strong>.
           </p>
         </div>
-
-        <div style="padding: 22px 24px;">
-          <!-- Section 1: Today's Tasks -->
-          <h2 style="margin: 0 0 10px; font-size: 16.5px; color: #027a48;">🟢 משימות ושיחות להיום (${openTodayTasks.length})</h2>
-          <table style="width: 100%; border-collapse: collapse; border: 1px solid #e4e7ec; border-radius: 10px; overflow: hidden; margin-bottom: 24px; font-size: 13.5px;">
+        <div style="padding: 18px 20px;">
+          <h3 style="margin: 0 0 8px; font-size: 15px; color: #027a48;">🟢 משימות ושיחות להיום (${openTodayTasks.length})</h3>
+          <table style="width: 100%; border-collapse: collapse; border: 1px solid #e4e7ec; margin-bottom: 18px; font-size: 13px;">
             <thead>
               <tr style="background: #f2f4f7; color: #667085; text-align: right;">
-                <th style="padding: 10px;">שעה</th>
-                <th style="padding: 10px;">סוג הפעילות והערה</th>
-                <th style="padding: 10px;">שם הליד</th>
-                <th style="padding: 10px;">שלב בפייפליין</th>
-                <th style="padding: 10px;">חיוג / וואטסאפ</th>
+                <th style="padding: 8px;">שעה</th>
+                <th style="padding: 8px;">פעילות והערה</th>
+                <th style="padding: 8px;">שם הליד</th>
+                <th style="padding: 8px;">שלב</th>
+                <th style="padding: 8px;">קשר מהיר</th>
               </tr>
             </thead>
-            <tbody>
-              ${buildTaskRowsHtml(openTodayTasks, false)}
-            </tbody>
+            <tbody>${buildTaskRowsHtml(openTodayTasks, false)}</tbody>
           </table>
 
-          <!-- Section 2: Overdue Tasks -->
-          <h2 style="margin: 0 0 10px; font-size: 16.5px; color: #b42318;">🔴 משימות שלא בוצעו / באיחור (${overdueTasks.length})</h2>
-          <table style="width: 100%; border-collapse: collapse; border: 1px solid #e4e7ec; border-radius: 10px; overflow: hidden; margin-bottom: 24px; font-size: 13.5px;">
+          <h3 style="margin: 0 0 8px; font-size: 15px; color: #b42318;">🔴 משימות שלא בוצעו / באיחור (${overdueTasks.length})</h3>
+          <table style="width: 100%; border-collapse: collapse; border: 1px solid #e4e7ec; font-size: 13px;">
             <thead>
               <tr style="background: #fef3f2; color: #b42318; text-align: right;">
-                <th style="padding: 10px;">תאריך יעד</th>
-                <th style="padding: 10px;">סוג הפעילות והערה</th>
-                <th style="padding: 10px;">שם הליד</th>
-                <th style="padding: 10px;">שלב בפייפליין</th>
-                <th style="padding: 10px;">חיוג / וואטסאפ</th>
+                <th style="padding: 8px;">תאריך יעד</th>
+                <th style="padding: 8px;">פעילות והערה</th>
+                <th style="padding: 8px;">שם הליד</th>
+                <th style="padding: 8px;">שלב</th>
+                <th style="padding: 8px;">קשר מהיר</th>
               </tr>
             </thead>
-            <tbody>
-              ${buildTaskRowsHtml(overdueTasks, true)}
-            </tbody>
+            <tbody>${buildTaskRowsHtml(overdueTasks, true)}</tbody>
           </table>
-
-          <!-- CTA Button -->
-          <div style="text-align: center; margin-top: 26px;">
-            <a href="${webAppUrl}" style="display: inline-block; background: #2e90fa; color: #ffffff; text-decoration: none; padding: 12px 26px; border-radius: 10px; font-weight: 700; font-size: 15px;">
-              כניסה למערכת הלידים והמשימות — בית היוגה ⬅️
-            </a>
-          </div>
-        </div>
-
-        <div style="background: #f2f4f7; padding: 14px 24px; font-size: 12px; color: #667085; text-align: center; border-top: 1px solid #e4e7ec;">
-          נשלח אוטומטית ממערכת ה-CRM של בית היוגה (Google Sheets & Apps Script)
         </div>
       </div>
     </div>
   `;
 
-  MailApp.sendEmail({
-    to: recipients.join(","),
-    subject: subject,
-    htmlBody: htmlBody,
-  });
-
   return {
     ok: true,
     recipients: recipients,
+    subject: subject,
+    htmlBody: htmlBody,
+    plainText: plainLines.join("\n"),
     todayCount: openTodayTasks.length,
     overdueCount: overdueTasks.length,
-    totalSent: totalOpenCount,
   };
 }
 
 // ============================================================================
-// 4. Time-Based Column Transition Cron (Runs Hourly on Google Servers)
+// 3. Time-Based Column Transition Cron (Runs Hourly on Google Servers)
 // ============================================================================
 
 function runTimeBasedAutomationsCron() {
@@ -492,7 +391,7 @@ function runTimeBasedAutomationsEngine_() {
 }
 
 // ============================================================================
-// 5. Google Sheets Database Initialization & Read/Write Engine
+// 4. Google Sheets Database Initialization & Read/Write Engine
 // ============================================================================
 
 function ensureDatabaseInitialized_() {
@@ -503,19 +402,6 @@ function ensureDatabaseInitialized_() {
   if (!hasLeads || !hasStages) {
     seedDefaultData_(false);
   }
-}
-
-function getAllowedUsersList_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.USERS);
-  if (!sheet) {
-    return [{ email: PRIMARY_OWNER_EMAIL, name: "דורון", receiveDailyEmail: true }];
-  }
-  const rows = readSheetObjects_(SHEET_NAMES.USERS);
-  if (rows.length === 0) {
-    return [{ email: PRIMARY_OWNER_EMAIL, name: "דורון", receiveDailyEmail: true }];
-  }
-  return rows;
 }
 
 function seedDefaultData_(overwriteExisting) {
@@ -737,12 +623,14 @@ function seedDefaultData_(overwriteExisting) {
     {
       email: PRIMARY_OWNER_EMAIL,
       name: "דורון (מנהל מערכת)",
+      accessCode: "nati1234",
       receiveDailyEmail: true,
       addedAt: todayKey,
     },
     {
-      email: "lightsofyoga@gmail.com",
+      email: SECONDARY_OWNER_EMAIL,
       name: "בית היוגה",
+      accessCode: "nati1234",
       receiveDailyEmail: true,
       addedAt: todayKey,
     },
@@ -766,8 +654,8 @@ function seedDefaultData_(overwriteExisting) {
   if (overwriteExisting || !ss.getSheetByName(SHEET_NAMES.TASKS)) {
     writeSheetObjects_(SHEET_NAMES.TASKS, ["id", "leadId", "type", "dueDate", "dueTime", "note", "done"], defaultTasks);
   }
-  if (!ss.getSheetByName(SHEET_NAMES.USERS)) {
-    writeSheetObjects_(SHEET_NAMES.USERS, ["email", "name", "receiveDailyEmail", "addedAt"], defaultUsers);
+  if (overwriteExisting || !ss.getSheetByName(SHEET_NAMES.USERS)) {
+    writeSheetObjects_(SHEET_NAMES.USERS, ["email", "name", "accessCode", "receiveDailyEmail", "addedAt"], defaultUsers);
   }
 }
 
@@ -838,10 +726,6 @@ function writeSheetObjects_(sheetName, headers, objectsArray) {
   sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#f2f4f7");
   sheet.setFrozenRows(1);
 }
-
-// ============================================================================
-// 6. Date & String Utilities
-// ============================================================================
 
 function getOffsetDateKey_(daysOffset) {
   const d = new Date();

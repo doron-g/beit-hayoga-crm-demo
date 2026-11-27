@@ -12,6 +12,47 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <!-- LOGIN GATE OVERLAY (Authorized Gmail Accounts Only) -->
+  <div id="loginGateOverlay" class="login-gate-overlay">
+    <div class="login-card">
+      <div class="login-logo">
+        <img src="logo.png" class="by-logo-img" alt="בית היוגה" />
+      </div>
+      <h1>בית היוגה · CRM</h1>
+      <p>כניסה למורשים בלבד באמצעות חשבון הג'ימייל המורשה</p>
+
+      <div id="loginErrorBox" class="login-error"></div>
+
+      <form onsubmit="handleLoginSubmit(event)" style="display: flex; flex-direction: column; gap: 12px; text-align: right;">
+        <div class="form-field">
+          <label for="loginEmailInput">כתובת ג'ימייל מורשית</label>
+          <input
+            id="loginEmailInput"
+            type="email"
+            class="input-control"
+            dir="ltr"
+            required
+            placeholder="dgescheidt3@gmail.com / lightsofyoga@gmail.com"
+          />
+        </div>
+        <div class="form-field">
+          <label for="loginPassInput">סיסמה / קוד גישה</label>
+          <input
+            id="loginPassInput"
+            type="password"
+            class="input-control"
+            dir="ltr"
+            required
+            placeholder="••••••••"
+          />
+        </div>
+        <button id="loginSubmitBtn" class="btn" type="submit" style="width: 100%; margin-top: 4px; height: 42px; font-size: 15px;">
+          כניסה למערכת
+        </button>
+      </form>
+    </div>
+  </div>
+
   <div class="app-shell">
     <!-- Right Sidebar (Branded for Beit HaYoga) -->
     <aside class="sidebar">
@@ -45,7 +86,10 @@
       </nav>
 
       <div class="sidebar-foot">
+        <button class="nav-item" type="button" onclick="openUsersAndEmailModal()">🔐 מורשים ומייל יומי</button>
+        <button class="nav-item" type="button" onclick="sendDailyEmailTestNow()">📩 שלח מייל משימות יומי</button>
         <button class="nav-item" type="button" onclick="resetDemoData()">🔄 איפוס נתוני דמו לברירת מחדל</button>
+        <button class="nav-item" type="button" onclick="handleLogout()">↩️ התנתקות</button>
       </div>
     </aside>
 
