@@ -592,7 +592,18 @@ function readSheetObjects_(sheetName) {
     headers.forEach((h, colIdx) => {
       let val = row[colIdx];
       if (val instanceof Date) {
-        val = Utilities.formatDate(val, "Asia/Jerusalem", "yyyy-MM-dd");
+        if (h === "dueTime") {
+          val = Utilities.formatDate(val, "Asia/Jerusalem", "HH:mm");
+        } else {
+          val = Utilities.formatDate(val, "Asia/Jerusalem", "yyyy-MM-dd");
+        }
+      }
+      if (h === "dueDate" && typeof val === "string" && val.includes("/")) {
+        // Normalize DD/MM/YYYY to YYYY-MM-DD if manually edited in sheet
+        const p = val.trim().split("/");
+        if (p.length === 3 && p[2].length === 4) {
+          val = `${p[2]}-${p[1].padStart(2, "0")}-${p[0].padStart(2, "0")}`;
+        }
       }
       if (h === "notes") {
         try {
@@ -634,6 +645,13 @@ function writeSheetObjects_(sheetName, headers, objectsArray) {
       return val;
     });
     rows.push(row);
+  });
+
+  // Format text/date/phone columns as Plain Text (@) BEFORE writing so Google Sheets never mangles leading zeros in phones or converts dueTime/dueDate into Date serials
+  headers.forEach((h, idx) => {
+    if (h === "phone" || h === "dueDate" || h === "dueTime" || h === "id" || h === "leadId" || h === "stageId" || h === "fromStageId" || h === "toStageId" || h === "accessCode") {
+      sheet.getRange(1, idx + 1, rows.length, 1).setNumberFormat("@");
+    }
   });
 
   sheet.getRange(1, 1, rows.length, headers.length).setValues(rows);

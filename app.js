@@ -436,7 +436,7 @@ function getRuleDurationMs(rule) {
 
 function switchPage(pageName) {
   state.activePage = pageName;
-  saveState();
+  saveState(true);
 
   const isCrm = pageName === "crm";
   document.getElementById("pageCrm").style.display = isCrm ? "flex" : "none";
@@ -614,7 +614,7 @@ function handleDrop(event, targetStageId) {
 
 function setTasksTab(tabName) {
   state.tasksTab = tabName;
-  saveState();
+  saveState(true);
   renderTasksPage();
 }
 
@@ -850,10 +850,41 @@ function handleCreateTaskModal(event) {
   closeNewTaskModal();
 }
 
+function normalizeDateString(val) {
+  const s = String(val || "").trim();
+  if (!s) return getOffsetDateKey(0);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (s.includes("T")) {
+    const dPart = s.split("T")[0];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dPart)) return dPart;
+  }
+  if (s.includes("/")) {
+    const p = s.split("/");
+    if (p.length === 3 && p[2].length === 4) {
+      return `${p[2]}-${p[1].padStart(2, "0")}-${p[0].padStart(2, "0")}`;
+    }
+  }
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    return toDateKey(parsed);
+  }
+  return getOffsetDateKey(0);
+}
+
+function normalizeTimeString(val) {
+  const s = String(val || "").trim();
+  if (!s) return "10:00";
+  const match = s.match(/(\d{1,2}):(\d{2})/);
+  if (match) {
+    return `${match[1].padStart(2, "0")}:${match[2]}`;
+  }
+  return "10:00";
+}
+
 function createTaskForLead(leadId, type, dueDateTimeStr, note) {
-  const [datePart, timePart] = (dueDateTimeStr || "").split("T");
-  const dueDate = datePart || getOffsetDateKey(0);
-  const dueTime = (timePart || "10:00").slice(0, 5);
+  const [datePart, timePart] = String(dueDateTimeStr || "").split("T");
+  const dueDate = normalizeDateString(datePart);
+  const dueTime = normalizeTimeString(timePart || "10:00");
 
   const newTask = {
     id: "T" + Date.now(),
@@ -879,10 +910,30 @@ function createTaskForLead(leadId, type, dueDateTimeStr, note) {
     });
   }
 
+  // If user is on the My Tasks page, automatically switch to the matching tab (Today / Tomorrow / Range) so they immediately see the newly created task!
+  const todayKey = getOffsetDateKey(0);
+  const tomorrowKey = getOffsetDateKey(1);
+  const yesterdayKey = getOffsetDateKey(-1);
+  if (dueDate === todayKey) {
+    state.tasksTab = "today";
+  } else if (dueDate === tomorrowKey) {
+    state.tasksTab = "tomorrow";
+  } else if (dueDate === yesterdayKey) {
+    state.tasksTab = "yesterday";
+  } else if (dueDate < todayKey) {
+    state.tasksTab = "overdue";
+  } else {
+    state.tasksTab = "range";
+    const rangeFromInput = document.getElementById("taskRangeFrom");
+    const rangeToInput = document.getElementById("taskRangeTo");
+    if (rangeFromInput) rangeFromInput.value = todayKey;
+    if (rangeToInput && (!rangeToInput.value || rangeToInput.value < dueDate)) rangeToInput.value = dueDate;
+  }
+
   saveState();
   renderAll();
   if (activeDrawerLeadId === leadId) renderDrawerContent(leadId);
-  showToast(`⏭️ נקבעה פעילות "${typeInfo.short}" לליד ${lead ? lead.name : ""}`);
+  showToast(`⏭️ נקבעה פעילות "${typeInfo.short}" ל-${formatDateDisplay(dueDate)} בשעה ${dueTime}`);
 }
 
 // ============================================================================
@@ -1179,7 +1230,7 @@ function renderAll() {
 
 function setViewMode(mode) {
   state.viewMode = mode;
-  saveState();
+  saveState(true);
   document.getElementById("tabKanban").classList.toggle("active", mode === "kanban");
   document.getElementById("tabList").classList.toggle("active", mode === "list");
   document.getElementById("kanbanView").style.display = mode === "kanban" ? "flex" : "none";
@@ -1189,7 +1240,7 @@ function setViewMode(mode) {
 
 function toggleShowAllColumns(checked) {
   state.showAllColumns = checked;
-  saveState();
+  saveState(true);
   renderAll();
 }
 
@@ -1523,6 +1574,38 @@ function toggleDrawerActivityForm() {
   formEl.style.display = formEl.style.display === "none" ? "flex" : "none";
 }
 
+function toggleDrawerEditLeadForm() {
+  const formEl = document.getElementById("drawerEditLeadForm");
+  if (!formEl) return;
+  formEl.style.display = formEl.style.display === "none" ? "flex" : "none";
+}
+
+function handleDrawerSaveLeadDetails(event, leadId) {
+  event.preventDefault();
+  const lead = getLeadById(leadId);
+  if (!lead) return;
+  lead.name = document.getElementById("editLeadName").value.trim() || lead.name;
+  lead.phone = document.getElementById("editLeadPhone").value.trim() || lead.phone;
+  lead.email = document.getElementById("editLeadEmail").value.trim();
+  lead.meta = document.getElementById("editLeadMeta").value.trim();
+  saveState();
+  renderAll();
+  renderDrawerContent(leadId);
+  showToast("✅ פרטי הליד עודכנו ונשמרו");
+}
+
+function deleteLead(leadId) {
+  const lead = getLeadById(leadId);
+  if (!lead) return;
+  if (!confirm(`האם למחוק את הליד "${lead.name}" ואת כל המשימות המשויכות אליו?`)) return;
+  state.leads = (state.leads || []).filter((l) => l.id !== leadId);
+  state.tasks = (state.tasks || []).filter((t) => t.leadId !== leadId);
+  saveState();
+  closeLeadDrawer();
+  renderAll();
+  showToast(`🗑️ הליד "${lead.name}" נמחק`);
+}
+
 function handleDrawerCreateActivity(event, leadId) {
   event.preventDefault();
   const type = document.getElementById("drawerActType").value;
@@ -1556,7 +1639,7 @@ function renderDrawerContent(leadId) {
 
   // Lead tasks section ("⏭️ הפעולה הבאה")
   const leadTasks = (state.tasks || []).filter((t) => t.leadId === lead.id);
-  const defaultTomorrow = `${getOffsetDateKey(1)}T10:00`;
+  const defaultToday = `${getOffsetDateKey(0)}T10:00`;
 
   const leadTasksHtml =
     leadTasks.length === 0
@@ -1603,7 +1686,35 @@ function renderDrawerContent(leadId) {
       <a class="btn secondary sm" href="${getWhatsAppUrl(lead.phone)}" target="_blank" rel="noreferrer">💬 וואטסאפ</a>
       <a class="btn secondary sm" href="tel:${escapeHtml(lead.phone)}">📞 חייג</a>
       ${lead.email ? `<a class="btn secondary sm" href="mailto:${escapeHtml(lead.email)}">✉️ מייל</a>` : ""}
+      <button class="btn secondary sm" type="button" onclick="toggleDrawerEditLeadForm()">✏️ עריכת פרטים</button>
+      <button class="btn danger sm" type="button" onclick="deleteLead('${lead.id}')">🗑️ מחק ליד</button>
     </div>
+
+    <form id="drawerEditLeadForm" class="activity-form" style="display: none; background: var(--panel-2);" onsubmit="handleDrawerSaveLeadDetails(event, '${lead.id}')">
+      <div style="font-weight: 700; font-size: 13px;">✏️ עריכת פרטי ליד</div>
+      <div class="form-field">
+        <label>שם מלא</label>
+        <input id="editLeadName" type="text" class="input-control" style="height: 34px;" value="${escapeHtml(lead.name)}" required />
+      </div>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>טלפון</label>
+          <input id="editLeadPhone" type="text" class="input-control" style="height: 34px;" dir="ltr" value="${escapeHtml(lead.phone)}" required />
+        </div>
+        <div class="form-field">
+          <label>אימייל</label>
+          <input id="editLeadEmail" type="email" class="input-control" style="height: 34px;" dir="ltr" value="${escapeHtml(lead.email || "")}" />
+        </div>
+      </div>
+      <div class="form-field">
+        <label>קמפיין / מקור</label>
+        <input id="editLeadMeta" type="text" class="input-control" style="height: 34px;" value="${escapeHtml(lead.meta || "")}" />
+      </div>
+      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+        <button class="btn secondary sm" type="button" onclick="toggleDrawerEditLeadForm()">ביטול</button>
+        <button class="btn sm" type="submit">שמור שינויים</button>
+      </div>
+    </form>
 
     ${ruleBoxHtml}
 
@@ -1636,7 +1747,7 @@ function renderDrawerContent(leadId) {
           </div>
           <div class="form-field">
             <label>מתי</label>
-            <input id="drawerActDue" type="datetime-local" class="input-control" style="height: 34px;" dir="ltr" value="${defaultTomorrow}" required />
+            <input id="drawerActDue" type="datetime-local" class="input-control" style="height: 34px;" dir="ltr" value="${defaultToday}" required />
           </div>
         </div>
         <div class="form-field">
@@ -1744,6 +1855,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 let syncTimeoutId = null;
 let hasLoadedFromCloud = false;
+let hasPendingLocalMutations = false;
 const isRunningInGoogleAppsScript = typeof google !== "undefined" && google.script && google.script.run;
 const GAS_CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbz0N5z3Kmf6-CPJFwZsKtULi-uw5wHEeZVMiQC3OGF9WaqXKXTxVTEF-h2qnby-VxeC/exec";
 
@@ -1774,13 +1886,21 @@ function setSyncIndicator(status, text) {
 
 // Override saveState to sync directly with Google Sheets (works both in Apps Script AND on GitHub Pages!)
 const originalLocalSaveState = saveState;
-saveState = function () {
+saveState = function (isBootOrReadOnly = false) {
   originalLocalSaveState();
+
+  if (!isBootOrReadOnly) {
+    hasPendingLocalMutations = true;
+  }
 
   if (!hasLoadedFromCloud) {
     return;
   }
 
+  pushStateToCloudNow();
+};
+
+function pushStateToCloudNow() {
   const syncPayload = {
     stages: state.stages,
     rules: state.rules,
@@ -1796,6 +1916,7 @@ saveState = function () {
   if (syncTimeoutId) clearTimeout(syncTimeoutId);
 
   syncTimeoutId = setTimeout(() => {
+    hasPendingLocalMutations = false;
     if (isRunningInGoogleAppsScript) {
       google.script.run
         .withSuccessHandler(() => {
@@ -1822,8 +1943,8 @@ saveState = function () {
           setSyncIndicator("error", "שגיאת סנכרון לשיטס");
         });
     }
-  }, 350);
-};
+  }, 250);
+}
 
 // Override resetDemoData to also reset Google Sheets when in Apps Script
 const originalLocalResetDemoData = resetDemoData;
@@ -1847,13 +1968,26 @@ resetDemoData = function () {
 
 function applyServerState(serverState) {
   if (!serverState) return;
+  const wasWaitingWithMutations = !hasLoadedFromCloud && hasPendingLocalMutations;
   hasLoadedFromCloud = true;
-  if (Array.isArray(serverState.stages) && serverState.stages.length > 0) state.stages = serverState.stages;
-  if (Array.isArray(serverState.rules)) state.rules = serverState.rules;
-  if (Array.isArray(serverState.leads)) state.leads = serverState.leads;
-  if (Array.isArray(serverState.tasks)) state.tasks = serverState.tasks;
-  if (Array.isArray(serverState.allowedUsers)) state.allowedUsers = serverState.allowedUsers;
-  if (Array.isArray(serverState.users) && !serverState.allowedUsers) state.allowedUsers = serverState.users;
+
+  if (!wasWaitingWithMutations) {
+    if (Array.isArray(serverState.stages) && serverState.stages.length > 0) state.stages = serverState.stages;
+    if (Array.isArray(serverState.rules)) state.rules = serverState.rules;
+    if (Array.isArray(serverState.leads)) state.leads = serverState.leads;
+    if (Array.isArray(serverState.tasks)) {
+      state.tasks = serverState.tasks.map((t) => ({
+        ...t,
+        dueDate: normalizeDateString(t.dueDate),
+        dueTime: normalizeTimeString(t.dueTime),
+      }));
+    }
+    if (Array.isArray(serverState.allowedUsers)) state.allowedUsers = serverState.allowedUsers;
+    if (Array.isArray(serverState.users) && !serverState.allowedUsers) state.allowedUsers = serverState.users;
+  } else {
+    // User already created/edited an item while initial fetch was in flight — push merged state to cloud
+    pushStateToCloudNow();
+  }
 
   // Auto-unlock login screen if Google Sheets DocumentProperties saved the logged-in user!
   if (serverState.savedSessionUser && serverState.savedSessionUser.email) {
