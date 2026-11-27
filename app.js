@@ -1716,6 +1716,8 @@ document.addEventListener("DOMContentLoaded", () => {
 // ============================================================================
 
 let syncTimeoutId = null;
+let hasLoadedFromCloud = false;
+const isRunningInGoogleAppsScript = typeof google !== "undefined" && google.script && google.script.run;
 
 function setSyncIndicator(status, text) {
   const badge = document.getElementById("syncStatusBadge");
@@ -1747,7 +1749,12 @@ const originalLocalSaveState = saveState;
 saveState = function () {
   originalLocalSaveState();
 
-  if (typeof google !== "undefined" && google.script && google.script.run) {
+  if (isRunningInGoogleAppsScript) {
+    // CRITICAL SAFETY GUARD: Never push local state to Google Sheets before the initial cloud load has completed!
+    if (!hasLoadedFromCloud) {
+      return;
+    }
+
     setSyncIndicator("saving", "שומר ל-Google Sheets…");
     if (syncTimeoutId) clearTimeout(syncTimeoutId);
 
@@ -1796,6 +1803,7 @@ resetDemoData = function () {
 
 function applyServerState(serverState) {
   if (!serverState) return;
+  hasLoadedFromCloud = true;
   if (Array.isArray(serverState.stages) && serverState.stages.length > 0) state.stages = serverState.stages;
   if (Array.isArray(serverState.rules)) state.rules = serverState.rules;
   if (Array.isArray(serverState.leads)) state.leads = serverState.leads;
