@@ -747,3 +747,35 @@ function escapeHtml_(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+
+
+// ============================================================================
+// 5. פונקציית שליחת המייל היומי האוטומטית (רצה בשרתי גוגל כל בוקר ב-08:00)
+// ============================================================================
+
+/**
+ * פונקציה זו נשלחת אוטומטית כל בוקר ב-08:00 ע"י הטריגר של גוגל (או בלחיצה על Run לבדיקה)
+ */
+function sendDailyOpenTasksEmail() {
+  ensureDatabaseInitialized_();
+  const digest = buildDailyDigestPayload_();
+
+  const recipientsList = (digest.recipients && digest.recipients.length > 0)
+    ? digest.recipients.join(",")
+    : PRIMARY_OWNER_EMAIL;
+
+  MailApp.sendEmail({
+    to: recipientsList,
+    subject: digest.subject,
+    body: digest.plainText,
+    htmlBody: digest.htmlBody,
+    name: "בית היוגה · CRM",
+  });
+
+  return {
+    ok: true,
+    sentTo: recipientsList,
+    todayCount: digest.todayCount,
+    overdueCount: digest.overdueCount,
+  };
+}
