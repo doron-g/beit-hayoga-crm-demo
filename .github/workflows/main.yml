@@ -1,0 +1,26 @@
+name: Daily 08:00 AM Tasks Email (Beit HaYoga CRM)
+
+on:
+  schedule:
+    # Runs every day at 06:00 UTC (08:00 AM Israel Standard Time)
+    - cron: "0 6 * * *"
+  workflow_dispatch: # Allows manual one-click test from the Actions tab in GitHub
+
+jobs:
+  send-daily-tasks-email:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Fetch Google Sheets Tasks & Send Daily Digest Email
+        env:
+          GAS_WEBAPP_URL: ${{ secrets.GAS_WEBAPP_URL }}
+          GMAIL_USER: "dgescheidt3@gmail.com"
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: python scripts/send_daily_digest.py
