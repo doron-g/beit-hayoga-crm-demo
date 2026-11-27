@@ -4539,6 +4539,18 @@ function checkExistingLoginSession() {
       }
     }
   } catch (e) {}
+
+  try {
+    const match = document.cookie.match(new RegExp("(?:^|; )" + AUTH_SESSION_KEY + "=([^;]*)"));
+    if (match && match[1]) {
+      const user = JSON.parse(decodeURIComponent(match[1]));
+      if (user && user.email) {
+        unlockAppForUser(user);
+        return;
+      }
+    }
+  } catch (e) {}
+
   const gate = document.getElementById("loginGateOverlay");
   if (gate) gate.classList.remove("hidden");
 }
@@ -4562,53 +4574,52 @@ function handleLoginSubmit(event) {
 
   errBox.style.display = "none";
 
-  const localAllowed = state.allowedUsers && state.allowedUsers.length > 0
-    ? state.allowedUsers
-    : [
-        { email: "dgescheidt3@gmail.com", name: "דורון (מנהל מערכת)", accessCode: "nati1234", receiveDailyEmail: true },
-        { email: "lightsofyoga@gmail.com", name: "בית היוגה", accessCode: "nati1234", receiveDailyEmail: true },
-      ];
+  const defaultAllowed = [
+    { email: "dgescheidt3@gmail.com", name: "דורון (מנהל מערכת)", accessCode: "nati1234", receiveDailyEmail: true },
+    { email: "lightsofyoga@gmail.com", name: "בית היוגה", accessCode: "nati1234", receiveDailyEmail: true },
+  ];
 
-  if (typeof google !== "undefined" && google.script && google.script.run) {
-    submitBtn.disabled = true;
-    submitBtn.textContent = "מאמת חשבון מול Google Sheets…";
-    google.script.run
-      .withSuccessHandler((res) => {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "כניסה למערכת";
-        if (res && res.ok) {
-          localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(res.user));
-          unlockAppForUser(res.user);
-          showToast(`👋 שלום ${res.user.name}! התחברת בהצלחה`);
-        } else {
-          errBox.textContent = (res && res.error) || "גישה נדחתה";
-          errBox.style.display = "block";
-        }
-      })
-      .withFailureHandler((err) => {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "כניסה למערכת";
-        errBox.textContent = "שגיאת אימות: " + (err.message || err);
-        errBox.style.display = "block";
-      })
-      .apiVerifyLogin(email, pass);
-  } else {
-    const found = localAllowed.find((u) => (u.email || "").trim().toLowerCase() === email);
-    if (!found) {
-      errBox.textContent = `⛔ החשבון ${email} אינו מופיע ברשימת המורשים של בית היוגה.`;
-      errBox.style.display = "block";
-      return;
-    }
-    const expected = String(found.accessCode || "nati1234").trim();
-    if (expected && pass !== expected) {
-      errBox.textContent = "סיסמה / קוד גישה שגויים";
-      errBox.style.display = "block";
-      return;
-    }
-    const user = { email: found.email, name: found.name || found.email };
+  // Merge sheet users with the two core owners so both always work
+  const mergedAllowed = [...defaultAllowed];
+  if (Array.isArray(state.allowedUsers)) {
+    state.allowedUsers.forEach((u) => {
+      const em = String(u.email || "").trim().toLowerCase();
+      if (em && !mergedAllowed.some((m) => m.email.toLowerCase() === em)) {
+        mergedAllowed.push(u);
+      }
+    });
+  }
+
+  const found = mergedAllowed.find((u) => String(u.email || "").trim().toLowerCase() === email);
+  if (!found) {
+    errBox.textContent = `⛔ החשבון ${email} אינו מופיע ברשימת המורשים של בית היוגה.`;
+    errBox.style.display = "block";
+    return;
+  }
+
+  const expected = String(found.accessCode || "nati1234").trim();
+  if (expected && pass !== expected) {
+    errBox.textContent = "סיסמה / קוד גישה שגויים";
+    errBox.style.display = "block";
+    return;
+  }
+
+  const user = { email: found.email, name: found.name || found.email };
+  try {
     localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(user));
-    unlockAppForUser(user);
-    showToast(`👋 שלום ${user.name}! התחברת בהצלחה`);
+  } catch (e) {}
+  try {
+    document.cookie = `${AUTH_SESSION_KEY}=${encodeURIComponent(JSON.stringify(user))}; max-age=31536000; path=/; SameSite=None; Secure`;
+  } catch (e) {}
+
+  unlockAppForUser(user);
+  showToast(`👋 שלום ${user.name}! התחברת בהצלחה`);
+
+  // Also persist in Google Apps Script DocumentProperties in background if available
+  if (isRunningInGoogleAppsScript) {
+    try {
+      google.script.run.apiVerifyLogin(email, pass);
+    } catch (e) {}
   }
 }
 
