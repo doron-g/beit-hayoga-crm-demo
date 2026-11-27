@@ -54,7 +54,7 @@ function setupDatabaseNow() {
 function doGet(e) {
   ensureDatabaseInitialized_();
 
-  // If requested by GitHub Actions daily 08:00 AM cron (?feed=daily_digest), return JSON payload
+  // If requested by GitHub Actions daily 08:00 AM cron OR GitHub Pages web client (?feed=daily_digest)
   if (e && e.parameter && e.parameter.feed === "daily_digest") {
     runTimeBasedAutomationsEngine_();
     const tasks = readSheetObjects_(SHEET_NAMES.TASKS);
@@ -69,6 +69,7 @@ function doGet(e) {
       tasks: tasks,
       leads: leads,
       stages: stages,
+      rules: readSheetObjects_(SHEET_NAMES.RULES),
       users: users,
     };
 
@@ -90,9 +91,55 @@ function doGet(e) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+function doPost(e) {
+  ensureDatabaseInitialized_();
+  try {
+    const raw = e && e.postData && e.postData.contents ? e.postData.contents : "{}";
+    const body = JSON.parse(raw);
+
+    if (body.action === "verifyLogin") {
+      const res = apiVerifyLogin(body.email, body.pass);
+      return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (body.action === "syncState") {
+      const res = apiSyncState(body.payload || {});
+      return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (body.action === "resetDemoData") {
+      const res = apiResetDemoData();
+      return ContentService.createTextOutput(JSON.stringify({ ok: true, state: res })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: "Unknown action" })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
 // ============================================================================
 // 1. Login & Authorization API (Checks against AllowedUsers in Google Sheets)
 // ============================================================================
+
+const SESSION_PROP_KEY = "BY_CRM_ACTIVE_SESSION_USER";
+
+function apiGetActiveSession() {
+  try {
+    const raw = PropertiesService.getDocumentProperties().getProperty(SESSION_PROP_KEY);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch (e) {}
+  return null;
+}
+
+function apiLogoutSession() {
+  try {
+    PropertiesService.getDocumentProperties().deleteProperty(SESSION_PROP_KEY);
+  } catch (e) {}
+  return { ok: true };
+}
 
 function apiVerifyLogin(emailInput, passInput) {
   ensureDatabaseInitialized_();
@@ -121,12 +168,18 @@ function apiVerifyLogin(emailInput, passInput) {
     };
   }
 
+  const userObj = {
+    email: found.email,
+    name: found.name || found.email,
+  };
+
+  try {
+    PropertiesService.getDocumentProperties().setProperty(SESSION_PROP_KEY, JSON.stringify(userObj));
+  } catch (e) {}
+
   return {
     ok: true,
-    user: {
-      email: found.email,
-      name: found.name || found.email,
-    },
+    user: userObj,
   };
 }
 
@@ -139,6 +192,7 @@ function apiGetInitialState() {
   runTimeBasedAutomationsEngine_();
 
   return {
+    savedSessionUser: apiGetActiveSession(),
     stages: readSheetObjects_(SHEET_NAMES.STAGES),
     rules: readSheetObjects_(SHEET_NAMES.RULES),
     leads: readSheetObjects_(SHEET_NAMES.LEADS),

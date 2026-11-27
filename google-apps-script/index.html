@@ -4213,6 +4213,7 @@ document.addEventListener("DOMContentLoaded", () => {
 let syncTimeoutId = null;
 let hasLoadedFromCloud = false;
 const isRunningInGoogleAppsScript = typeof google !== "undefined" && google.script && google.script.run;
+const GAS_CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbz0N5z3Kmf6-CPJFwZsKtULi-uw5wHEeZVMiQC3OGF9WaqXKXTxVTEF-h2qnby-VxeC/exec";
 
 function setSyncIndicator(status, text) {
   const badge = document.getElementById("syncStatusBadge");
@@ -4239,23 +4240,33 @@ function setSyncIndicator(status, text) {
   }
 }
 
-// Override saveState to sync directly with Google Sheets when running in Google Apps Script
+// Override saveState to sync directly with Google Sheets (works both in Apps Script AND on GitHub Pages!)
 const originalLocalSaveState = saveState;
 saveState = function () {
   originalLocalSaveState();
 
-  if (isRunningInGoogleAppsScript) {
-    // CRITICAL SAFETY GUARD: Never push local state to Google Sheets before the initial cloud load has completed!
-    if (!hasLoadedFromCloud) {
-      return;
-    }
+  if (!hasLoadedFromCloud) {
+    return;
+  }
 
-    setSyncIndicator("saving", "שומר ל-Google Sheets…");
-    if (syncTimeoutId) clearTimeout(syncTimeoutId);
+  const syncPayload = {
+    stages: state.stages,
+    rules: state.rules,
+    leads: state.leads,
+    tasks: state.tasks,
+    allowedUsers: state.allowedUsers || [
+      { email: "dgescheidt3@gmail.com", name: "דורון (מנהל מערכת)", receiveDailyEmail: true },
+      { email: "lightsofyoga@gmail.com", name: "בית היוגה", receiveDailyEmail: true },
+    ],
+  };
 
-    syncTimeoutId = setTimeout(() => {
+  setSyncIndicator("saving", "שומר ל-Google Sheets…");
+  if (syncTimeoutId) clearTimeout(syncTimeoutId);
+
+  syncTimeoutId = setTimeout(() => {
+    if (isRunningInGoogleAppsScript) {
       google.script.run
-        .withSuccessHandler((res) => {
+        .withSuccessHandler(() => {
           setSyncIndicator("saved", "מסונכרן עם Google Sheets ✓");
         })
         .withFailureHandler((err) => {
@@ -4263,17 +4274,23 @@ saveState = function () {
           setSyncIndicator("error", "שגיאת סנכרון לשיטס");
           showToast("⚠️ שגיאה בשמירה ל-Google Sheets: " + (err.message || err));
         })
-        .apiSyncState({
-          stages: state.stages,
-          rules: state.rules,
-          leads: state.leads,
-          tasks: state.tasks,
-          allowedUsers: state.allowedUsers || [
-            { email: "dgescheidt3@gmail.com", name: "דורון (מנהל מערכת)", receiveDailyEmail: true },
-          ],
+        .apiSyncState(syncPayload);
+    } else if (GAS_CLOUD_API_URL) {
+      fetch(GAS_CLOUD_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "syncState", payload: syncPayload }),
+      })
+        .then((r) => r.json())
+        .then(() => {
+          setSyncIndicator("saved", "מסונכרן עם Google Sheets ✓");
+        })
+        .catch((err) => {
+          console.error("Cloud sync error:", err);
+          setSyncIndicator("error", "שגיאת סנכרון לשיטס");
         });
-    }, 350);
-  }
+    }
+  }, 350);
 };
 
 // Override resetDemoData to also reset Google Sheets when in Apps Script
@@ -4303,20 +4320,15 @@ function applyServerState(serverState) {
   if (Array.isArray(serverState.rules)) state.rules = serverState.rules;
   if (Array.isArray(serverState.leads)) state.leads = serverState.leads;
   if (Array.isArray(serverState.tasks)) state.tasks = serverState.tasks;
-  if (Array.isArray(serverState.allowedUsers)) {
-    state.allowedUsers = serverState.allowedUsers;
-    // Automatically ensure lightsofyoga@gmail.com is added to the sheet if missing
-    const hasYoga = state.allowedUsers.some((u) => String(u.email || "").toLowerCase() === "lightsofyoga@gmail.com");
-    if (!hasYoga) {
-      state.allowedUsers.push({
-        email: "lightsofyoga@gmail.com",
-        name: "בית היוגה",
-        accessCode: "nati1234",
-        receiveDailyEmail: true,
-        addedAt: getOffsetDateKey(0),
-      });
-      saveState();
-    }
+  if (Array.isArray(serverState.allowedUsers)) state.allowedUsers = serverState.allowedUsers;
+  if (Array.isArray(serverState.users) && !serverState.allowedUsers) state.allowedUsers = serverState.users;
+
+  // Auto-unlock login screen if Google Sheets DocumentProperties saved the logged-in user!
+  if (serverState.savedSessionUser && serverState.savedSessionUser.email) {
+    try {
+      localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(serverState.savedSessionUser));
+    } catch (e) {}
+    unlockAppForUser(serverState.savedSessionUser);
   }
 
   if (serverState.currentUser && serverState.currentUser.email) {
@@ -4477,9 +4489,9 @@ function installDailyTriggersNow() {
   }
 }
 
-// Automatically pull live state from Google Sheets on boot when hosted on Google Apps Script
+// Automatically pull live state from Google Sheets on boot (both in Apps Script AND on GitHub Pages!)
 document.addEventListener("DOMContentLoaded", () => {
-  if (typeof google !== "undefined" && google.script && google.script.run) {
+  if (isRunningInGoogleAppsScript) {
     setSyncIndicator("saving", "טוען נתונים מ-Google Sheets…");
     google.script.run
       .withSuccessHandler((serverState) => {
@@ -4492,6 +4504,20 @@ document.addEventListener("DOMContentLoaded", () => {
         showToast("⚠️ לא ניתן לטעון מ-Google Sheets: " + (err.message || err));
       })
       .apiGetInitialState();
+  } else if (GAS_CLOUD_API_URL) {
+    setSyncIndicator("saving", "טוען נתונים מ-Google Sheets…");
+    fetch(GAS_CLOUD_API_URL + "?feed=daily_digest")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && data.ok) {
+          applyServerState(data);
+          setSyncIndicator("saved", "מחובר ל-Google Sheets ✓");
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not fetch from Google Sheets API, using local cache:", err);
+        hasLoadedFromCloud = true;
+      });
   }
 });
 
@@ -4587,7 +4613,12 @@ function handleLoginSubmit(event) {
 }
 
 function handleLogout() {
-  localStorage.removeItem(AUTH_SESSION_KEY);
+  try {
+    localStorage.removeItem(AUTH_SESSION_KEY);
+  } catch (e) {}
+  if (isRunningInGoogleAppsScript) {
+    google.script.run.apiLogoutSession();
+  }
   const gate = document.getElementById("loginGateOverlay");
   if (gate) gate.classList.remove("hidden");
   showToast("🔒 התנתקת מהמערכת");
