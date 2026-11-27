@@ -9,10 +9,9 @@ import json
 import os
 import smtplib
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from zoneinfo import ZoneInfo
 
 TASK_TYPE_LABELS = {
     "call": "📞 שיחת טלפון",
@@ -51,7 +50,7 @@ def fetch_crm_data(webapp_url: str) -> dict:
 
 
 def build_email_html(data: dict, crm_url: str) -> tuple[str, str, list[str]]:
-    il_now = datetime.now(ZoneInfo("Asia/Jerusalem"))
+    il_now = datetime.now(timezone(timedelta(hours=2)))
     today_key = data.get("todayKey") or il_now.strftime("%Y-%m-%d")
     today_display = format_date_display(today_key)
 
