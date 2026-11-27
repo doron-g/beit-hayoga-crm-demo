@@ -1800,7 +1800,21 @@ function applyServerState(serverState) {
   if (Array.isArray(serverState.rules)) state.rules = serverState.rules;
   if (Array.isArray(serverState.leads)) state.leads = serverState.leads;
   if (Array.isArray(serverState.tasks)) state.tasks = serverState.tasks;
-  if (Array.isArray(serverState.allowedUsers)) state.allowedUsers = serverState.allowedUsers;
+  if (Array.isArray(serverState.allowedUsers)) {
+    state.allowedUsers = serverState.allowedUsers;
+    // Automatically ensure lightsofyoga@gmail.com is added to the sheet if missing
+    const hasYoga = state.allowedUsers.some((u) => String(u.email || "").toLowerCase() === "lightsofyoga@gmail.com");
+    if (!hasYoga) {
+      state.allowedUsers.push({
+        email: "lightsofyoga@gmail.com",
+        name: "בית היוגה",
+        accessCode: "nati1234",
+        receiveDailyEmail: true,
+        addedAt: getOffsetDateKey(0),
+      });
+      saveState();
+    }
+  }
 
   if (serverState.currentUser && serverState.currentUser.email) {
     const badge = document.getElementById("currentUserBadge");

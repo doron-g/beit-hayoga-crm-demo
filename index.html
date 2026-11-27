@@ -499,6 +499,65 @@
     </div>
   </div>
 
+  <!-- MODAL 5: Authorized Gmail Users & Daily Email Trigger Settings -->
+  <div id="usersModal" class="modal-backdrop" onclick="if(event.target===this) closeUsersAndEmailModal()">
+    <div class="modal-panel" style="max-width: 680px;">
+      <div class="modal-head">
+        <h2>🔐 ניהול חשבונות ג'ימייל מורשים ומייל משימות יומי</h2>
+        <button class="btn secondary sm" type="button" onclick="closeUsersAndEmailModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="background: #ecfdf3; border: 1px solid #a6f4c5; padding: 14px 16px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="font-weight: 700; color: #027a48; font-size: 14.5px;">📩 דו"ח משימות פתוחות יומי בג'ימייל</div>
+            <div id="triggersStatusLabel" style="font-size: 12.5px; color: #027a48; margin-top: 2px;">
+              מרכז את כל המשימות הפתוחות להיום + משימות שלא בוצעו עבור כל מי שמסומן למטה.
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn sm" style="background: #16b364;" type="button" onclick="sendDailyEmailTestNow()">
+              📩 שלח מייל משימות להיום כעת
+            </button>
+          </div>
+        </div>
+
+        <p style="margin: 0; color: var(--muted); font-size: 13.5px;">
+          רק כתובות הג'ימייל שמופיעות ברשימה זו (ובלשונית <code>AllowedUsers</code> בגוגל שיטס) מורשות להיכנס למערכת. כל הוספה או הסרה כאן מתעדכנת מיד בגוגל שיטס!
+        </p>
+
+        <form class="manager-row" style="background: #eff8ff; border-color: #b9e0fe;" onsubmit="handleAddAllowedUser(event)">
+          <input
+            id="newAllowedEmail"
+            type="email"
+            class="input-control"
+            dir="ltr"
+            style="flex: 1; height: 36px;"
+            placeholder="כתובת ג'ימייל חדשה (למשל user@gmail.com)…"
+            required
+          />
+          <input
+            id="newAllowedName"
+            type="text"
+            class="input-control"
+            style="width: 140px; height: 36px;"
+            placeholder="שם התצוגה…"
+            required
+          />
+          <label class="checkbox-label">
+            <input id="newAllowedDailyMail" type="checkbox" checked />
+            <span>מייל יומי</span>
+          </label>
+          <button class="btn sm" type="submit">+ הוסף מורשה</button>
+        </form>
+
+        <div id="allowedUsersList" class="list-manager"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" type="button" onclick="closeUsersAndEmailModal()">סגור</button>
+      </div>
+    </div>
+  </div>
+
   <!-- DRAWER: Lead Detail & Timeline -->
   <div id="leadDrawerBackdrop" class="drawer-backdrop" onclick="if(event.target===this) closeLeadDrawer()">
     <aside class="drawer" aria-label="פרטי ליד">
