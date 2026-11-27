@@ -375,6 +375,13 @@ function computeLeadNextActionInfo(lead) {
   };
 }
 
+function getWhatsAppUrl(phone) {
+  const digits = String(phone || "").replace(/[^0-9]/g, "");
+  if (!digits) return "#";
+  const intl = digits.startsWith("0") ? "972" + digits.slice(1) : digits;
+  return `https://wa.me/${intl}`;
+}
+
 function getPlatformBadgeClass(platform) {
   switch (platform) {
     case "אינסטגרם":
@@ -736,9 +743,14 @@ function renderTasksPage() {
                   <a class="tasks-studio-link" onclick="event.stopPropagation(); openLeadDrawer('${lead.id}', event)" title="לכרטיס הליד">
                     ${escapeHtml(lead.name)}
                   </a>
-                  <a class="tasks-phone" href="tel:${escapeHtml(lead.phone)}" dir="ltr" onclick="event.stopPropagation()">
-                    📞 ${escapeHtml(lead.phone)}
-                  </a>
+                  <div class="lead-contact-row" style="margin-top: 3px;" onclick="event.stopPropagation()">
+                    <a class="tasks-phone" href="tel:${escapeHtml(lead.phone)}" dir="ltr">
+                      📞 ${escapeHtml(lead.phone)}
+                    </a>
+                    <a class="wa-inline-btn" href="${getWhatsAppUrl(lead.phone)}" target="_blank" rel="noreferrer" title="פתח שיחת וואטסאפ">
+                      💬 וואטסאפ
+                    </a>
+                  </div>
                 `
                 : `<span style="color: var(--muted);">ליד שנמחק</span>`
             }
@@ -1055,9 +1067,14 @@ function renderLeadCardHtml(lead) {
         </div>
       </div>
 
-      <a class="lead-phone" href="tel:${escapeHtml(lead.phone)}" onclick="event.stopPropagation()">
-        📞 ${escapeHtml(lead.phone)}
-      </a>
+      <div class="lead-contact-row" onclick="event.stopPropagation()">
+        <a class="lead-phone" href="tel:${escapeHtml(lead.phone)}" title="חייג לליד">
+          📞 ${escapeHtml(lead.phone)}
+        </a>
+        <a class="wa-inline-btn" href="${getWhatsAppUrl(lead.phone)}" target="_blank" rel="noreferrer" title="שלח הודעת וואטסאפ">
+          💬 וואטסאפ
+        </a>
+      </div>
 
       ${lead.meta ? `<div class="lead-meta">${escapeHtml(lead.meta)}</div>` : ""}
 
@@ -1126,7 +1143,12 @@ function renderListView() {
       return `
         <tr onclick="openLeadDrawer('${lead.id}', event)">
           <td><strong>${escapeHtml(lead.name)}</strong></td>
-          <td dir="ltr" style="color: var(--accent); font-weight: 600;">${escapeHtml(lead.phone)}</td>
+          <td onclick="event.stopPropagation()">
+            <div class="lead-contact-row">
+              <a class="lead-phone" href="tel:${escapeHtml(lead.phone)}" dir="ltr">📞 ${escapeHtml(lead.phone)}</a>
+              <a class="wa-inline-btn" href="${getWhatsAppUrl(lead.phone)}" target="_blank" rel="noreferrer" title="שלח הודעת וואטסאפ">💬 וואטסאפ</a>
+            </div>
+          </td>
           <td dir="ltr">${escapeHtml(lead.email || "—")}</td>
           <td onclick="event.stopPropagation()">
             <select class="lead-stage-select" onchange="moveLeadToStage('${lead.id}', this.value, 'תצוגת רשימה')">
@@ -1578,7 +1600,7 @@ function renderDrawerContent(leadId) {
 
   document.getElementById("drawerBodyContent").innerHTML = `
     <div class="drawer-actions">
-      <a class="btn secondary sm" href="https://wa.me/${lead.phone.replace(/[^0-9]/g, "")}" target="_blank" rel="noreferrer">💬 וואטסאפ</a>
+      <a class="btn secondary sm" href="${getWhatsAppUrl(lead.phone)}" target="_blank" rel="noreferrer">💬 וואטסאפ</a>
       <a class="btn secondary sm" href="tel:${escapeHtml(lead.phone)}">📞 חייג</a>
       ${lead.email ? `<a class="btn secondary sm" href="mailto:${escapeHtml(lead.email)}">✉️ מייל</a>` : ""}
     </div>
@@ -1631,7 +1653,12 @@ function renderDrawerContent(leadId) {
 
     <dl class="drawer-details">
       <dt>טלפון</dt>
-      <dd dir="ltr">${escapeHtml(lead.phone)}</dd>
+      <dd>
+        <div class="lead-contact-row">
+          <a class="lead-phone" href="tel:${escapeHtml(lead.phone)}" dir="ltr">📞 ${escapeHtml(lead.phone)}</a>
+          <a class="wa-inline-btn" href="${getWhatsAppUrl(lead.phone)}" target="_blank" rel="noreferrer">💬 וואטסאפ</a>
+        </div>
+      </dd>
       <dt>אימייל</dt>
       <dd dir="ltr">${escapeHtml(lead.email || "—")}</dd>
       <dt>פלטפורמה</dt>
