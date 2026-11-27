@@ -82,8 +82,11 @@ function doGet(e) {
 
   return template
     .evaluate()
-    .setTitle("בית היוגה · מערכת ניהול לידים ומשימות (CRM)")
+    .setTitle("בית היוגה · CRM")
+    .setFaviconUrl("https://doron-g.github.io/beit-hayoga-crm-demo/apple-touch-icon.png")
     .addMetaTag("viewport", "width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content")
+    .addMetaTag("apple-mobile-web-app-capable", "yes")
+    .addMetaTag("apple-mobile-web-app-title", "בית היוגה")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
