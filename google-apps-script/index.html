@@ -1902,6 +1902,150 @@ button, a, [role="button"], .nav-item, .view-tab, .tasks-tab, .act-check, .kanba
   }
 }
 
+/* ============================================================================
+   Mobile Native Card Layout for "📋 המשימות שלי" (My Tasks) & List View
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .tasks-filters {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .tasks-filters .crm-search,
+  .tasks-filters .crm-search input {
+    width: 100%;
+    min-width: 0 !important;
+  }
+
+  .tasks-filters .btn {
+    width: 100%;
+    height: 40px;
+  }
+
+  #tasksSummaryCount {
+    text-align: center;
+    padding: 2px 0;
+  }
+
+  .tasks-table-wrap {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .tasks-table,
+  .tasks-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .tasks-table thead {
+    display: none;
+  }
+
+  .tasks-table tr.tasks-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "done title del"
+      "done date  date"
+      "done lead  stage";
+    column-gap: 12px;
+    row-gap: 6px;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 13px 14px;
+    box-shadow: var(--shadow-xs);
+  }
+
+  .tasks-table tr.tasks-row td {
+    border-bottom: none;
+    padding: 0;
+  }
+
+  .tasks-table td.tasks-col-done {
+    grid-area: done;
+    width: auto;
+    align-self: flex-start;
+    padding-top: 2px !important;
+  }
+
+  .tasks-table td.tasks-col-done .act-check {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+
+  .tasks-table td.tasks-col-title {
+    grid-area: title;
+    min-width: 0;
+  }
+
+  .tasks-table .tasks-body-hint {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    max-width: 100%;
+    margin-top: 5px;
+    line-height: 1.4;
+  }
+
+  .tasks-table td.tasks-col-del {
+    grid-area: del;
+    align-self: flex-start;
+  }
+
+  .tasks-table td.tasks-col-date:not(.tasks-col-time) {
+    grid-area: date;
+    font-size: 12.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tasks-table td.tasks-col-time {
+    display: none;
+  }
+
+  .tasks-table td.tasks-col-lead {
+    grid-area: lead;
+    min-width: 0;
+    border-top: 1px solid var(--border);
+    padding-top: 8px !important;
+    margin-top: 2px;
+  }
+
+  .tasks-table td.tasks-col-stage {
+    grid-area: stage;
+    border-top: 1px solid var(--border);
+    padding-top: 8px !important;
+    margin-top: 2px;
+    font-size: 12px;
+    text-align: left;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+}
+
+.mobile-time-inline {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-time-inline {
+    display: inline;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -3181,7 +3325,7 @@ function renderTasksPage() {
 
       return `
         <tr class="tasks-row ${task.done ? "tasks-row-done" : ""}" onclick="if('${lead?.id || ""}') openLeadDrawer('${lead?.id || ""}', event)">
-          <td class="tasks-col-done" onclick="event.stopPropagation()">
+          <td class="tasks-col-done" data-label="בוצע" onclick="event.stopPropagation()">
             <button
               type="button"
               class="act-check ${task.done ? "task-check-done" : ""}"
@@ -3189,16 +3333,17 @@ function renderTasksPage() {
               onclick="toggleTaskDone('${task.id}')"
             >✓</button>
           </td>
-          <td class="tasks-col-date ${dateClass}">
+          <td class="tasks-col-date ${dateClass}" data-label="תאריך">
             ${formatDateDisplay(task.dueDate)}
+            <span class="mobile-time-inline" style="color: var(--muted); font-weight: 600;">· ${escapeHtml(task.dueTime || "10:00")}</span>
             ${overdueTag}
           </td>
-          <td class="tasks-col-date" dir="ltr">${escapeHtml(task.dueTime || "10:00")}</td>
-          <td class="tasks-col-title">
+          <td class="tasks-col-date tasks-col-time" dir="ltr" data-label="שעה">${escapeHtml(task.dueTime || "10:00")}</td>
+          <td class="tasks-col-title" data-label="פעילות">
             <span class="tasks-title-chip">${typeInfo.label}</span>
             ${task.note ? `<span class="tasks-body-hint" title="${escapeHtml(task.note)}">${escapeHtml(task.note)}</span>` : ""}
           </td>
-          <td>
+          <td class="tasks-col-lead" data-label="ליד">
             ${
               lead
                 ? `
@@ -3217,10 +3362,10 @@ function renderTasksPage() {
                 : `<span style="color: var(--muted);">ליד שנמחק</span>`
             }
           </td>
-          <td>
+          <td class="tasks-col-stage" data-label="שלב">
             <span style="color: var(--muted); font-weight: 600;">${escapeHtml(stage ? stage.name : "—")}</span>
           </td>
-          <td style="text-align: left;" onclick="event.stopPropagation()">
+          <td class="tasks-col-del" style="text-align: left;" onclick="event.stopPropagation()">
             <button class="btn danger sm" type="button" onclick="deleteTask('${task.id}')" title="מחק פעילות">🗑️</button>
           </td>
         </tr>

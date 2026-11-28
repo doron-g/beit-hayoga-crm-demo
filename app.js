@@ -719,7 +719,7 @@ function renderTasksPage() {
 
       return `
         <tr class="tasks-row ${task.done ? "tasks-row-done" : ""}" onclick="if('${lead?.id || ""}') openLeadDrawer('${lead?.id || ""}', event)">
-          <td class="tasks-col-done" onclick="event.stopPropagation()">
+          <td class="tasks-col-done" data-label="בוצע" onclick="event.stopPropagation()">
             <button
               type="button"
               class="act-check ${task.done ? "task-check-done" : ""}"
@@ -727,16 +727,17 @@ function renderTasksPage() {
               onclick="toggleTaskDone('${task.id}')"
             >✓</button>
           </td>
-          <td class="tasks-col-date ${dateClass}">
+          <td class="tasks-col-date ${dateClass}" data-label="תאריך">
             ${formatDateDisplay(task.dueDate)}
+            <span class="mobile-time-inline" style="color: var(--muted); font-weight: 600;">· ${escapeHtml(task.dueTime || "10:00")}</span>
             ${overdueTag}
           </td>
-          <td class="tasks-col-date" dir="ltr">${escapeHtml(task.dueTime || "10:00")}</td>
-          <td class="tasks-col-title">
+          <td class="tasks-col-date tasks-col-time" dir="ltr" data-label="שעה">${escapeHtml(task.dueTime || "10:00")}</td>
+          <td class="tasks-col-title" data-label="פעילות">
             <span class="tasks-title-chip">${typeInfo.label}</span>
             ${task.note ? `<span class="tasks-body-hint" title="${escapeHtml(task.note)}">${escapeHtml(task.note)}</span>` : ""}
           </td>
-          <td>
+          <td class="tasks-col-lead" data-label="ליד">
             ${
               lead
                 ? `
@@ -755,10 +756,10 @@ function renderTasksPage() {
                 : `<span style="color: var(--muted);">ליד שנמחק</span>`
             }
           </td>
-          <td>
+          <td class="tasks-col-stage" data-label="שלב">
             <span style="color: var(--muted); font-weight: 600;">${escapeHtml(stage ? stage.name : "—")}</span>
           </td>
-          <td style="text-align: left;" onclick="event.stopPropagation()">
+          <td class="tasks-col-del" style="text-align: left;" onclick="event.stopPropagation()">
             <button class="btn danger sm" type="button" onclick="deleteTask('${task.id}')" title="מחק פעילות">🗑️</button>
           </td>
         </tr>
