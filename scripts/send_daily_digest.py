@@ -23,8 +23,35 @@ TASK_TYPE_LABELS = {
 }
 
 
+def normalize_date_str(val: str) -> str:
+    s = str(val or "").strip()
+    if not s:
+        return ""
+    if "T" in s:
+        d_part = s.split("T")[0]
+        if len(d_part) == 10 and d_part[4] == "-" and d_part[7] == "-":
+            return d_part
+    if "/" in s:
+        parts = s.split("/")
+        if len(parts) == 3 and len(parts[2]) == 4:
+            return f"{parts[2]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
+    return s[:10] if len(s) >= 10 else s
+
+
+def normalize_time_str(val: str) -> str:
+    s = str(val or "").strip()
+    if not s:
+        return "10:00"
+    import re
+    m = re.search(r"(\d{1,2}):(\d{2})", s)
+    if m:
+        return f"{m.group(1).zfill(2)}:{m.group(2)}"
+    return "10:00"
+
+
 def format_date_display(yyyy_mm_dd: str) -> str:
-    parts = str(yyyy_mm_dd or "").split("-")
+    norm = normalize_date_str(yyyy_mm_dd)
+    parts = str(norm or "").split("-")
     if len(parts) != 3:
         return str(yyyy_mm_dd or "")
     return f"{parts[2]}/{parts[1]}/{parts[0]}"
@@ -60,12 +87,12 @@ def build_email_html(data: dict, crm_url: str) -> tuple[str, str, list[str]]:
     users = data.get("users") or []
 
     open_today = sorted(
-        [t for t in tasks if not t.get("done") and str(t.get("dueDate")) == today_key],
-        key=lambda x: str(x.get("dueTime") or "10:00"),
+        [t for t in tasks if not t.get("done") and normalize_date_str(t.get("dueDate")) == today_key],
+        key=lambda x: normalize_time_str(x.get("dueTime")),
     )
     overdue = sorted(
-        [t for t in tasks if not t.get("done") and str(t.get("dueDate", "")) < today_key],
-        key=lambda x: f"{x.get('dueDate')}T{x.get('dueTime')}",
+        [t for t in tasks if not t.get("done") and normalize_date_str(t.get("dueDate")) < today_key],
+        key=lambda x: f"{normalize_date_str(x.get('dueDate'))}T{normalize_time_str(x.get('dueTime'))}",
     )
 
     recipients = [
@@ -95,7 +122,7 @@ def build_email_html(data: dict, crm_url: str) -> tuple[str, str, list[str]]:
             rows_html.append(f"""
               <tr style="border-bottom: 1px solid #e4e7ec;">
                 <td style="padding: 12px 10px; font-weight: 700; color: {color}; white-space: nowrap;">
-                  {format_date_display(t.get("dueDate"))} · {escape_html(t.get("dueTime") or "10:00")}
+                  {format_date_display(t.get("dueDate"))} · {escape_html(normalize_time_str(t.get("dueTime")))}
                 </td>
                 <td style="padding: 12px 10px;">
                   <span style="background: #eaf4ff; color: #175cd3; padding: 3px 9px; border-radius: 6px; font-weight: 700; font-size: 12.5px; display: inline-block;">
