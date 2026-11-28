@@ -706,7 +706,7 @@ function renderTasksPage() {
     return;
   }
 
-  const rowsHtml = bucketTasks
+  const cardsHtml = bucketTasks
     .map((task) => {
       const lead = getLeadById(task.leadId);
       const stage = lead ? getStageById(lead.stageId) : null;
@@ -716,75 +716,71 @@ function renderTasksPage() {
 
       const dateClass = isOverdue ? "tasks-due-overdue" : isToday ? "tasks-due-today" : "";
       const overdueTag = isOverdue ? `<span class="tasks-due-tag">באיחור</span>` : "";
+      const stageColor = stage ? stage.color : "#98a2b3";
 
       return `
-        <tr class="tasks-row ${task.done ? "tasks-row-done" : ""}" onclick="if('${lead?.id || ""}') openLeadDrawer('${lead?.id || ""}', event)">
-          <td class="tasks-col-done" data-label="בוצע" onclick="event.stopPropagation()">
-            <button
-              type="button"
-              class="act-check ${task.done ? "task-check-done" : ""}"
-              title="${task.done ? "החזרה לפתוחות" : "סמן כבוצע"}"
-              onclick="toggleTaskDone('${task.id}')"
-            >✓</button>
-          </td>
-          <td class="tasks-col-date ${dateClass}" data-label="תאריך">
-            ${formatDateDisplay(task.dueDate)}
-            <span class="mobile-time-inline" style="color: var(--muted); font-weight: 600;">· ${escapeHtml(task.dueTime || "10:00")}</span>
-            ${overdueTag}
-          </td>
-          <td class="tasks-col-date tasks-col-time" dir="ltr" data-label="שעה">${escapeHtml(task.dueTime || "10:00")}</td>
-          <td class="tasks-col-title" data-label="פעילות">
-            <span class="tasks-title-chip">${typeInfo.label}</span>
-            ${task.note ? `<span class="tasks-body-hint" title="${escapeHtml(task.note)}">${escapeHtml(task.note)}</span>` : ""}
-          </td>
-          <td class="tasks-col-lead" data-label="ליד">
-            ${
-              lead
-                ? `
-                  <a class="tasks-studio-link" onclick="event.stopPropagation(); openLeadDrawer('${lead.id}', event)" title="לכרטיס הליד">
-                    ${escapeHtml(lead.name)}
-                  </a>
-                  <div class="lead-contact-row" style="margin-top: 3px;" onclick="event.stopPropagation()">
-                    <a class="tasks-phone" href="tel:${escapeHtml(lead.phone)}" dir="ltr">
-                      📞 ${escapeHtml(lead.phone)}
+        <article class="task-card-item ${task.done ? "task-card-done" : ""} ${isOverdue ? "task-card-overdue" : ""}" onclick="if('${lead?.id || ""}') openLeadDrawer('${lead?.id || ""}', event)">
+          <div class="task-card-top">
+            <div class="task-card-check-wrap" onclick="event.stopPropagation()">
+              <button
+                type="button"
+                class="act-check ${task.done ? "task-check-done" : ""}"
+                title="${task.done ? "החזרה לפתוחות" : "סמן כבוצע"}"
+                onclick="toggleTaskDone('${task.id}')"
+              >✓</button>
+            </div>
+
+            <div class="task-card-main">
+              <div class="task-card-header-row">
+                <span class="tasks-title-chip">${typeInfo.label}</span>
+                <span class="task-card-datetime ${dateClass}">
+                  📅 ${formatDateDisplay(task.dueDate)} · 🕒 <span dir="ltr">${escapeHtml(task.dueTime || "10:00")}</span>
+                  ${overdueTag}
+                </span>
+              </div>
+
+              ${task.note ? `<div class="task-card-note">${escapeHtml(task.note)}</div>` : ""}
+            </div>
+
+            <div class="task-card-del" onclick="event.stopPropagation()">
+              <button class="btn danger sm" type="button" onclick="deleteTask('${task.id}')" title="מחק פעילות">🗑️</button>
+            </div>
+          </div>
+
+          <div class="task-card-foot" onclick="event.stopPropagation()">
+            <div class="task-card-lead-info">
+              ${
+                lead
+                  ? `
+                    <a class="tasks-studio-link" onclick="openLeadDrawer('${lead.id}', event)" title="לכרטיס הליד">
+                      👤 ${escapeHtml(lead.name)}
                     </a>
-                    <a class="wa-inline-btn" href="${getWhatsAppUrl(lead.phone)}" target="_blank" rel="noreferrer" title="פתח שיחת וואטסאפ">
-                      💬 וואטסאפ
-                    </a>
-                  </div>
-                `
-                : `<span style="color: var(--muted);">ליד שנמחק</span>`
-            }
-          </td>
-          <td class="tasks-col-stage" data-label="שלב">
-            <span style="color: var(--muted); font-weight: 600;">${escapeHtml(stage ? stage.name : "—")}</span>
-          </td>
-          <td class="tasks-col-del" style="text-align: left;" onclick="event.stopPropagation()">
-            <button class="btn danger sm" type="button" onclick="deleteTask('${task.id}')" title="מחק פעילות">🗑️</button>
-          </td>
-        </tr>
+                    <div class="lead-contact-row" style="margin: 0;">
+                      <a class="tasks-phone" href="tel:${escapeHtml(lead.phone)}" dir="ltr">
+                        📞 ${escapeHtml(lead.phone)}
+                      </a>
+                      <a class="wa-inline-btn" href="${getWhatsAppUrl(lead.phone)}" target="_blank" rel="noreferrer" title="פתח שיחת וואטסאפ">
+                        💬 וואטסאפ
+                      </a>
+                    </div>
+                  `
+                  : `<span style="color: var(--muted);">ליד שנמחק</span>`
+              }
+            </div>
+
+            <div class="task-card-stage-pill">
+              <span class="stage-dot" style="--stage-color: ${stageColor};"></span>
+              <span>${escapeHtml(stage ? stage.name : "—")}</span>
+            </div>
+          </div>
+        </article>
       `;
     })
     .join("");
 
   contentArea.innerHTML = `
-    <div class="tasks-table-wrap">
-      <table class="data-table tasks-table">
-        <thead>
-          <tr>
-            <th class="tasks-col-done">בוצע</th>
-            <th>תאריך יעד</th>
-            <th>שעה</th>
-            <th>סוג הפעילות</th>
-            <th>שם</th>
-            <th>שלב</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rowsHtml}
-        </tbody>
-      </table>
+    <div class="tasks-cards-grid">
+      ${cardsHtml}
     </div>
   `;
 }
