@@ -1959,29 +1959,23 @@ button, a, [role="button"], .nav-item, .view-tab, .tasks-tab, .act-check, .kanba
         </div>
       </div>
 
-      <div class="local-badge-sidebar">
-        <span>🛡️</span>
-        <span>סביבת פיתוח מקומית (מבודד)</span>
+      <div id="syncStatusBadge" class="local-badge-sidebar" style="background: rgba(22, 179, 100, 0.16); border-color: rgba(22, 179, 100, 0.4); color: #a6f4c5;">
+        <span id="syncStatusIcon">☁️</span>
+        <span id="syncStatusText">מחובר ל-Google Sheets ✓</span>
       </div>
 
       <nav class="nav-list" aria-label="ניווט ראשי">
-        <button id="navLeads" class="nav-item active" type="button" onclick="switchPage('crm')">🗂️ לידים</button>
+        <button id="navLeads" class="nav-item active" type="button" onclick="switchPage('crm')">🗂️ הלידים שלי</button>
         <button id="navTasks" class="nav-item" type="button" onclick="switchPage('today')">
           <span>📋 המשימות שלי</span>
           <span id="sidebarOpenTasksBadge" style="margin-inline-start: auto; background: rgba(245,179,1,0.2); color: #fde68a; font-size: 11px; padding: 1px 7px; border-radius: 99px; font-weight: 700;">0</span>
         </button>
-        <button class="nav-item" type="button" onclick="openStatusesModal()">➕ ניהול והרחבת סטטוסים</button>
+        <button class="nav-item" type="button" onclick="openStatusesModal()">➕ ניהול סטטוסים ועמודות</button>
         <button class="nav-item" type="button" onclick="openAutomationsModal()">⚡ אוטומציות מעבר עמודות</button>
-        <button class="nav-item" type="button" onclick="showToast('בגרסה המקומית פעילים מסכי הלידים, המשימות והאוטומציות')">📞 מסך שיחות</button>
-        <button class="nav-item" type="button" onclick="showToast('בגרסה המקומית פעילים מסכי הלידים, המשימות והאוטומציות')">📊 דוחות</button>
-        <button class="nav-item" type="button" onclick="showToast('בגרסה המקומית פעילים מסכי הלידים, המשימות והאוטומציות')">🎁 חבר מביא חבר</button>
-        <button class="nav-item" type="button" onclick="showToast('בגרסה המקומית פעילים מסכי הלידים, המשימות והאוטומציות')">🔄 לקוחות חוזרים</button>
+        <button class="nav-item" type="button" onclick="openUsersAndEmailModal()">🔐 מורשים ומייל יומי</button>
       </nav>
 
       <div class="sidebar-foot">
-        <button class="nav-item" type="button" onclick="openUsersAndEmailModal()">🔐 מורשים ומייל יומי</button>
-        <button class="nav-item" type="button" onclick="sendDailyEmailTestNow()">📩 שלח מייל משימות יומי</button>
-        <button class="nav-item" type="button" onclick="resetDemoData()">🔄 איפוס נתוני דמו לברירת מחדל</button>
         <button class="nav-item" type="button" onclick="handleLogout()">↩️ התנתקות</button>
       </div>
     </aside>
